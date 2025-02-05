@@ -3,6 +3,9 @@
 WORKING_DIRECTORY=$1
 SSH_SOCK=$2
 
+cd $WORKING_DIRECTORY
+echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
+
 echo "Merge $GITHUB_BASE_REF into $WORKING_DIRECTORY to allow a merge result pipeline"
 
   # attempt to merge

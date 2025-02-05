@@ -1,6 +1,7 @@
 #!/bin/bash
 
 WORKING_DIRECTORY=$1
+echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
 BRANCHES_CACHE_FOLDER=/mnt/github/actions-runner/_work/data/branches
 FRAMEWORKS_CACHE_FOLDER=/mnt/github/actions-runner/_work/data/cache
 GIT_STRATEGY=none # we do the checkout process only once in init stage
