@@ -14,7 +14,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: ./setup-working-directory@v1
+    - uses: biznet-io/github-actions/setup-working-directory@v1
 
     - name: Run tests
       shell: bash
