@@ -10,11 +10,6 @@ inputs:
     required: true
     default: 'false'
 
-outputs:
-  working_directory:
-    description: 'The configured working directory path'
-    value: ${{ steps.set_working_directory.outputs.working_dir }}
-
 runs:
   using: 'composite'
   steps:
@@ -26,8 +21,7 @@ runs:
         else
           WORKING_DIRECTORY="${GITHUB_WORKSPACE}"
         fi
-        echo "working_dir=${WORKING_DIRECTORY}" >> $GITHUB_OUTPUT
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
         # Set as default working directory for following steps
-        echo "GITHUB_WORKSPACE=${WORKING_DIRECTORY}" >> $GITHUB_ENV
+        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> $GITHUB_ENV
