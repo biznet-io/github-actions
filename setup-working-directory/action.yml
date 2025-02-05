@@ -8,7 +8,7 @@ runs:
       shell: bash
       run: |
         if [[ -n "${GITHUB_HEAD_REF}" ]]; then
-          WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${{ inputs.base_ref }}"
+          WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${GITHUB_HEAD_REF}"
         else
           WORKING_DIRECTORY="${GITHUB_WORKSPACE}"
         fi
