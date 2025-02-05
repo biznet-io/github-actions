@@ -6,9 +6,20 @@ inputs:
     description: 'Working directory'
     required: true
 
+outputs:
+  WORKING_DIRECTORY:
+    description: 'The working directory path used for the repository'
+    value: ${{ steps.set_working_directory.outputs.WORKING_DIRECTORY }}
+
 runs:
   using: 'composite'
   steps:
+    - id: set_working_directory
+      shell: bash
+      run: |
+        WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${base_ref}"
+        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> $GITHUB_OUTPUT
+
     - name: Init Repository
       shell: bash
       run: ${{ github.action_path }}/init.sh ${{inputs.WORKING_DIRECTORY}}

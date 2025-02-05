@@ -1,0 +1,33 @@
+name: 'Setup Working Directory'
+description: 'Sets up the working directory for the job'
+
+inputs:
+  base_ref:
+    description: 'Base reference (branch name)'
+    required: true
+  is_merge_request:
+    description: 'Whether this is running in a merge request context'
+    required: true
+    default: 'false'
+
+outputs:
+  working_directory:
+    description: 'The configured working directory path'
+    value: ${{ steps.set_working_directory.outputs.working_dir }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: set_working_directory
+      shell: bash
+      run: |
+        if [[ "${{ inputs.is_merge_request }}" == "true" ]]; then
+          WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${{ inputs.base_ref }}"
+        else
+          WORKING_DIRECTORY="${GITHUB_WORKSPACE}"
+        fi
+        echo "working_dir=${WORKING_DIRECTORY}" >> $GITHUB_OUTPUT
+        # Make sure the directory exists
+        mkdir -p ${WORKING_DIRECTORY}
+        # Set as default working directory for following steps
+        echo "GITHUB_WORKSPACE=${WORKING_DIRECTORY}" >> $GITHUB_ENV
