@@ -1,16 +1,38 @@
 name: 'Setup Working Directory'
 description: 'Sets up the working directory for the job'
 
+inputs:
+  auto:
+    description: 'Use current working directory automatically'
+    default: 'true'
+    required: false
+  path:
+    description: 'Custom path for working directory (used when auto is false)'
+    default: ''
+    required: false
+
 runs:
   using: 'composite'
   steps:
     - id: set_working_directory
       shell: bash
       run: |
-        if [[ -n "${GITHUB_HEAD_REF}" ]]; then
-          WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${GITHUB_HEAD_REF}"
+        # If auto is true, use current working directory logic
+        if [[ "${{ inputs.auto }}" == "true" ]]; then
+          if [[ -n "${GITHUB_HEAD_REF}" ]]; then
+            WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${GITHUB_HEAD_REF}"
+          else
+            WORKING_DIRECTORY="${GITHUB_WORKSPACE}"
+          fi
         else
-          WORKING_DIRECTORY="${GITHUB_WORKSPACE}"
+          # If auto is false, use the provided path
+          WORKING_DIRECTORY="${GITHUB_WORKSPACE}/${{ inputs.path }}"
+
+          # Validate that path is not empty when auto is false
+          if [[ -z "$WORKING_DIRECTORY" ]]; then
+            echo "Error: When 'auto' is set to false, a valid 'path' must be provided"
+            exit 1
+          fi
         fi
 
         # Make sure the directory exists
