@@ -24,7 +24,7 @@ SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
 echo "Init repo"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 git config --global user.name "${GITHUB_ACTOR}"
-git config --global init.defaultBranch "${GITHUB_HEAD_REF}"
+git config --global init.defaultBranch "${GITHUB_REF}"
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
 
 if [ -f "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE" ]; then
@@ -46,14 +46,14 @@ if [ "$(git remote | grep origin)" != "origin" ]; then
   echo 'repository cache is empty, initializing it...'
 
   # Clone repository using SSH
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git -b "${GITHUB_HEAD_REF}" .
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git -b "${GITHUB_REF}" .
 
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
 else
   echo 'repository cache is already present, updating sources...'
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard origin/$GITHUB_HEAD_REF
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard origin/$GITHUB_REF
 fi
 
 echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE
@@ -65,11 +65,8 @@ if [ $GITHUB_BASE_REF ]; then
   "$SCRIPT_DIR/init-merge-result-pipeline.sh" "$WORKING_DIRECTORY" "$SSH_SOCK"
 fi
 
-### Never init cache for tag pipelines that are only triggered to promote a rc tag to a release tag
-if [ "$GITHUB_REF_TYPE" != "tag" ]; then
-  # Call init-cache.sh with the absolute path and pass working directory
-  "$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
-fi
+# Call init-cache.sh with the absolute path and pass working directory
+"$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
 
 # Immediately delete all identities
 SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
