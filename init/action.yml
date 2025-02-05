@@ -4,6 +4,7 @@ description: 'Initialize repository by checking out code and installing dependen
 runs:
   using: 'composite'
   steps:
+    - uses: ./setup-working-directory@v1
 
     - name: Init Repository
       shell: bash
