@@ -2,23 +2,13 @@ name: 'Repository Initialization'
 description: 'Initialize repository by checking out code and installing dependencies'
 
 inputs:
-  auto:
-    description: 'Use current working directory automatically'
-    default: 'true'
-    required: false
-  path:
-    description: 'Custom path for working directory (used when auto is false)'
-    default: ''
-    required: false
+  WORKING_DIRECTORY:
+    description: 'The working directory to init the workflow in'
+    required: true
 
 runs:
   using: 'composite'
   steps:
-    - uses: biznet-io/github-actions/setup-working-directory@v1
-      with:
-        auto: ${{ inputs.auto }}
-        path: ${{ inputs.path }}
-
     - name: Init Repository
       shell: bash
-      run: ${{ github.action_path }}/init.sh ${{ env.WORKING_DIRECTORY }}
+      run: ${{ github.action_path }}/init.sh ${{ inputs.WORKING_DIRECTORY }}
