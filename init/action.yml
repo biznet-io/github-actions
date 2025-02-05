@@ -16,8 +16,8 @@ runs:
   steps:
     - uses: biznet-io/github-actions/setup-working-directory@v1
       with:
-        auto: ${{ input.auto }}
-        path: ${{ input.path }}
+        auto: ${{ inputs.auto }}
+        path: ${{ inputs.path }}
 
     - name: Init Repository
       shell: bash
