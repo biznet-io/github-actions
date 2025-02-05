@@ -11,4 +11,4 @@ runs:
   steps:
     - name: Init Repository
       shell: bash
-      run: ${{ github.action_path }}/init-cache.sh ${{inputs.WORKING_DIRECTORY}}
+      run: ${{ github.action_path }}/init.sh ${{inputs.WORKING_DIRECTORY}}
