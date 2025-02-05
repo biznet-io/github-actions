@@ -48,6 +48,8 @@ if [ "$(git remote | grep origin)" != "origin" ]; then
   # Clone repository using SSH
   if [[ "$GITHUB_REF" == "refs/heads/"* ]]; then
     BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
+  elif [[ "$GITHUB_REF" == "refs/pull/"* ]]; then
+    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
   elif [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
     BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
   else
