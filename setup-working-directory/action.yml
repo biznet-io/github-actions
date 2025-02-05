@@ -20,3 +20,4 @@ runs:
 
         # Set as default working directory for following steps
         echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> $GITHUB_ENV
+        export GITHUB_WORKSPACE=${WORKING_DIRECTORY}"
