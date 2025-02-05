@@ -1,6 +1,5 @@
 #!/bin/bash
 
-BRANCHES_CACHE_FOLDER=/mnt/github/actions-runner/_work/data/branches
 FRAMEWORKS_CACHE_FOLDER=/mnt/github/actions-runner/_work/data/cache
 GIT_STRATEGY=none # we do the checkout process only once in init stage
 INIT_REPOSITORY_PIPELINE_ID_ENV_FILE=tmp.init-repository-pipeline-id.env
