@@ -46,7 +46,16 @@ if [ "$(git remote | grep origin)" != "origin" ]; then
   echo 'repository cache is empty, initializing it...'
 
   # Clone repository using SSH
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git -b "${GITHUB_REF}" .
+  if [[ "$GITHUB_REF" == "refs/heads/"* ]]; then
+    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
+  elif [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
+    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
+  else
+    echo "Invalid GITHUB_REF: $GITHUB_REF"
+    exit 1
+  fi
+
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --branch "$BRANCH_OR_TAG" git@github.com:${GITHUB_REPOSITORY}.git .
 
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
