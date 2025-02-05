@@ -47,12 +47,10 @@ if [ "$(git remote | grep origin)" != "origin" ]; then
 
   # Clone repository using SSH
   if [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
-    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --branch "$GITHUB_SHA" git@github.com:${GITHUB_REPOSITORY}.git .
   else
-    BRANCH_OR_TAG=$GITHUB_REF
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git -b "${GITHUB_REF}" .
   fi
-
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --branch "$BRANCH_OR_TAG" git@github.com:${GITHUB_REPOSITORY}.git .
 
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
