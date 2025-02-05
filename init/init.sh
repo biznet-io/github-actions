@@ -4,6 +4,9 @@ WORKING_DIRECTORY=$1
 mkdir -p $WORKING_DIRECTORY
 cd $WORKING_DIRECTORY
 echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "SCRIPT_DIR:" $SCRIPT_DIR
 
 # Create unique, secure socket
 SSH_SOCK=$(mktemp -u)
@@ -16,7 +19,7 @@ mkdir -p ~/.ssh
 ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
 # Add SSH key with strict permissions
-SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${{ secrets.SSH_PRIVATE_KEY }}"
+SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
 
 echo "Init repo"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
@@ -58,45 +61,14 @@ echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REP
 ### For Pull Request workflows in GitHub Actions, we need to test the merge result
 ### This is similar to GitLab's merged results pipelines
 if [ $GITHUB_BASE_REF ]; then
-  echo "Merge $GITHUB_BASE_REF into $WORKING_DIRECTORY to allow a merge result pipeline"
-
-  # attempt to merge
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git merge --no-commit --no-ff origin/$GITHUB_BASE_REF
-
-  # if merge conflict detected
-  if [ $? -ne 0 ]; then
-    echo "################################################################################################"
-    echo "################################################################################################"
-    echo "################################################################################################"
-    echo ""
-    echo "Merge conflict detected:"
-    echo "Resolve them by merging $GITHUB_BASE_REF into $GITHUB_HEAD_REF and push changes."
-    echo ""
-    echo "################################################################################################"
-    echo "################################################################################################"
-    echo "################################################################################################"
-
-    echo "Resetting and make the pipeline fail to handle conflicts..."
-
-    git merge --abort
-
-    echo "Add a comment to PR to notify assignee"
-  ADD_THREAD=$(curl --fail --output "/dev/null" --silent --show-error --write-out "HTTP response: ${http_code}\n\n" \
-    --data "{\"body\": \" :warning: Conflicts detected, resolve them by merging \`${GITHUB_BASE_REF}\` into \`${GITHUB_HEAD_REF}\` and then push changes.\"}" \
-    --header "Content-Type: application/json" \
-    --header "Authorization: token $GITHUB_TOKEN" \
-    --request POST \
-    "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${GITHUB_EVENT_NUMBER}/comments")
-
-    exit 1
-  else
-    echo "No conflicts, continue pull request pipeline"
-  fi
+  # Call init-merge-result-pipeline.sh with the absolute path and pass working directory
+  "$SCRIPT_DIR/init-merge-result-pipeline.sh" "$WORKING_DIRECTORY" "$SSH_SOCK"
 fi
 
 ### Never init cache for tag pipelines that are only triggered to promote a rc tag to a release tag
 if [ "$GITHUB_REF_TYPE" != "tag" ]; then
-  ./init-cache.sh
+  # Call init-cache.sh with the absolute path and pass working directory
+  "$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
 fi
 
 # Immediately delete all identities
