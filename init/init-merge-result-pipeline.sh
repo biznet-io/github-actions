@@ -9,8 +9,8 @@ echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
 echo "Merge $GITHUB_BASE_REF into $WORKING_DIRECTORY to allow a merge result pipeline"
 
   # attempt to merge
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin/$GITHUB_BASE_REF --depth 1
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git merge --no-commit --no-ff origin/$GITHUB_BASE_REF
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $GITHUB_BASE_REF --depth 1
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git merge --no-commit --no-ff $GITHUB_BASE_REF
 
   # if merge conflict detected
   if [ $? -ne 0 ]; then
