@@ -13,7 +13,7 @@ runs:
     - id: set_working_directory
       shell: bash
       run: |
-        WORKING_DIRECTORY="${{ inputs.path != '' && inputs.path || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${GITHUB_REF}"
+        WORKING_DIRECTORY="${{ inputs.path != '' && inputs.path || env.WORKING_DIRECTORY_PREFIX || secrets.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${GITHUB_REF}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
