@@ -7,13 +7,16 @@ inputs:
     default: '${{ env.WORKING_DIRECTORY_PREFIX }}'
     required: false
 
+env:
+  WORKING_DIRECTORY_PREFIX: ${{ inputs.path || env.WORKING_DIRECTORY_PREFIX }}
+
 runs:
   using: 'composite'
   steps:
     - id: set_working_directory
       shell: bash
       run: |
-        WORKING_DIRECTORY="${{ inputs.path }}/${GITHUB_REPOSITORY}/${GITHUB_REF}"
+        WORKING_DIRECTORY="${{ env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${GITHUB_REF}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
