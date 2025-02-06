@@ -7,6 +7,10 @@ inputs:
     default: ${{ env.WORKING_DIRECTORY_PREFIX || vars.WORKING_DIRECTORY_PREFIX }}
     required: true
 
+env:
+  WORKING_DIRECTORY_PREFIX: ${{ github.event.inputs.path != '' && github.event.inputs.path || vars.WORKING_DIRECTORY_PREFIX }}
+
+
 runs:
   using: 'composite'
   steps:
