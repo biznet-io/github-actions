@@ -4,8 +4,8 @@ description: 'Sets up the working directory for the job'
 inputs:
   path:
     description: 'Path where the working directory should be created'
-    default: '/mnt/data/container/github'
-    required: false
+    default: ${{ env.WORKING_DIRECTORY_PREFIX || vars.WORKING_DIRECTORY_PREFIX }}
+    required: true
 
 runs:
   using: 'composite'
@@ -13,7 +13,7 @@ runs:
     - id: set_working_directory
       shell: bash
       run: |
-        WORKING_DIRECTORY="${{ inputs.path }}/${GITHUB_REF}"
+        WORKING_DIRECTORY="${{ inputs.path }}/${GITHUB_REPOSITORY}/${GITHUB_REF}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}

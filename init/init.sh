@@ -80,4 +80,4 @@ fi
 "$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
 
 # Immediately delete all identities
-SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
+#SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
