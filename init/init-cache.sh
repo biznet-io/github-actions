@@ -3,8 +3,8 @@
 WORKING_DIRECTORY=$1
 echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
 
-BRANCHES_CACHE_FOLDER=${WORKING_DIRECTORY_PREFIX}/branches
-FRAMEWORKS_CACHE_FOLDER=${WORKING_DIRECTORY_PREFIX}/cache
+BRANCHES_CACHE_FOLDER=${WORKING_DIRECTORY_PREFIX}/${GITHUB_REPOSITORY}/branches
+FRAMEWORKS_CACHE_FOLDER=${WORKING_DIRECTORY_PREFIX}/${GITHUB_REPOSITORY}/cache
 
 function getSlug {
   local name=$1
@@ -21,10 +21,10 @@ function getSlug {
 
 function getTargetBranchCacheFolderName {
   local targetBranchNameSlug=$(getSlug "$GITHUB_HEAD_REF")
-  if [ -d "$BRANCHES_CACHE_FOLDER/$SCHEDULED_VALIDATE_PREFIX$targetBranchNameSlug" ]; then
-    echo "$BRANCHES_CACHE_FOLDER/$SCHEDULED_VALIDATE_PREFIX$targetBranchNameSlug"
+  if [ -d "$WORKING_DIRECTORY/$SCHEDULED_VALIDATE_PREFIX$targetBranchNameSlug" ]; then
+    echo "$WORKING_DIRECTORY/$SCHEDULED_VALIDATE_PREFIX$targetBranchNameSlug"
   else
-    echo "$BRANCHES_CACHE_FOLDER/$targetBranchNameSlug"
+    echo "$WORKING_DIRECTORY/$targetBranchNameSlug"
   fi
 }
 

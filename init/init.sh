@@ -44,19 +44,6 @@ fi
 
 if [ "$(git remote | grep origin)" != "origin" ]; then
   echo 'repository cache is empty, initializing it...'
-
-  # Clone repository using SSH
-  if [[ "$GITHUB_REF" == "refs/heads/"* ]]; then
-    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
-  elif [[ "$GITHUB_REF" == "refs/pull/"* ]]; then
-    BRANCH_OR_TAG=$GITHUB_HEAD_REF
-  elif [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
-    BRANCH_OR_TAG=$(echo "$GITHUB_REF" | cut -d/ -f3-)
-  else
-    echo "Invalid GITHUB_REF: $GITHUB_REF"
-    exit 1
-  fi
-
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_SHA"  git@github.com:${GITHUB_REPOSITORY}.git .
 
   git config merge.directoryRenames false
@@ -64,7 +51,7 @@ if [ "$(git remote | grep origin)" != "origin" ]; then
 else
   echo 'repository cache is already present, updating sources...'
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $BRANCH_OR_TAG
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $GITHUB_SHA
 fi
 
 echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE
