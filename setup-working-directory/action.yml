@@ -4,7 +4,7 @@ description: 'Sets up the working directory for the job'
 inputs:
   path:
     description: 'Path where the working directory should be created'
-    default: '${{ env.WORKING_DIRECTORY_PREFIX }}'
+    default: ''
     required: false
 
 env:
