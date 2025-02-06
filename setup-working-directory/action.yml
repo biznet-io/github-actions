@@ -8,8 +8,8 @@ inputs:
     required: false
 
 env:
-  WORKING_DIRECTORY_PREFIX: ${{ inputs.path != '' && inputs.path || vars.WORKING_DIRECTORY_PREFIX }}
-
+  WORKING_DIRECTORY_PREFIX: '${{ coalesce(inputs.path, vars.WORKING_DIRECTORY_PREFIX) }}'
+  
 runs:
   using: 'composite'
   steps:
