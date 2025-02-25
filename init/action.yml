@@ -7,8 +7,5 @@ inputs:
     required: true
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Init Repository
-      shell: bash
-      run: ${{ github.action_path }}/init.sh ${{ inputs.WORKING_DIRECTORY }}
+  using: 'node16'
+  main: 'dist/index.js'
