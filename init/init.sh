@@ -59,10 +59,19 @@ echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REP
 ### For Pull Request workflows in GitHub Actions, we need to test the merge result
 ### This is similar to GitLab's merged results pipelines
 if [ $GITHUB_BASE_REF ]; then
+
+  # Git fetch the target branch to allow nx making the diff
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $GITHUB_BASE_REF:refs/remotes/origin/$GITHUB_BASE_REF
 
-  # Call init-merge-result-pipeline.sh with the absolute path and pass working directory
-  "$SCRIPT_DIR/init-merge-result-pipeline.sh" "$WORKING_DIRECTORY" "$SSH_SOCK"
+  # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
+  PR_NUMBER=$(echo $GITHUB_REF | sed 's/refs\/pull\/\([0-9]*\)\/merge/\1/')
+
+  # Fetch the PR merge reference
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin pull/$PR_NUMBER/merge:pr-merge
+
+  # Check out the merge reference to be sure to test over it
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout pr-merge
+
 fi
 
 # Call init-cache.sh with the absolute path and pass working directory
