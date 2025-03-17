@@ -59,6 +59,8 @@ echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REP
 ### For Pull Request workflows in GitHub Actions, we need to test the merge result
 ### This is similar to GitLab's merged results pipelines
 if [ $GITHUB_BASE_REF ]; then
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $GITHUB_BASE_REF:refs/remotes/origin/$GITHUB_BASE_REF
+
   # Call init-merge-result-pipeline.sh with the absolute path and pass working directory
   "$SCRIPT_DIR/init-merge-result-pipeline.sh" "$WORKING_DIRECTORY" "$SSH_SOCK"
 fi
