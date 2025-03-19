@@ -66,10 +66,10 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
     git config merge.directoryRenames false
     git remote add origin git@github.com:${GITHUB_REPOSITORY}.git
     SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$DEFAULT_BRANCH" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_HEAD_REF" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
   else
-    # Directory is empty, safe to clone
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$DEFAULT_BRANCH" git@github.com:${GITHUB_REPOSITORY}.git .
+    echo "Directory is empty, safe to clone $GITHUB_HEAD_REF"
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF" git@github.com:${GITHUB_REPOSITORY}.git .
   fi
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
