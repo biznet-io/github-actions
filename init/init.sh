@@ -24,7 +24,7 @@ SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
 echo "Init repo"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 git config --global user.name "${GITHUB_ACTOR}"
-git config --global init.defaultBranch "${GITHUB_HEAD_REF}"
+git config --global init.defaultBranch "${GITHUB_HEAD_REF:-$GITHUB_REF#refs/heads/}"
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
 
 if [ -f "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE" ]; then
