@@ -24,7 +24,22 @@ SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
 echo "Init repo"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 git config --global user.name "${GITHUB_ACTOR}"
-git config --global init.defaultBranch "${GITHUB_HEAD_REF:-$GITHUB_REF}"
+
+# Determine default branch based on GitHub event
+if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+  # For pull requests, use the base branch
+  DEFAULT_BRANCH="$GITHUB_BASE_REF"
+elif [[ -n "$GITHUB_REF_NAME" ]]; then
+  # For pushes or other events with a ref
+  DEFAULT_BRANCH="$GITHUB_REF_NAME"
+else
+  # Fallback to main
+  DEFAULT_BRANCH="main"
+fi
+
+echo "Setting default branch to: $DEFAULT_BRANCH"
+git config --global init.defaultBranch "$DEFAULT_BRANCH"
+
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
 
 if [ -f "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE" ]; then
