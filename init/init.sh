@@ -24,7 +24,7 @@ SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
 echo "Init repo"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 git config --global user.name "${GITHUB_ACTOR}"
-git config --global init.defaultBranch "${GITHUB_REF}"
+git config --global init.defaultBranch "${GITHUB_HEAD_REF}"
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
 
 if [ -f "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE" ]; then
@@ -42,16 +42,26 @@ else
   echo "No init repository pipeline id variable found"
 fi
 
-if [ "$(git remote | grep origin)" != "origin" ]; then
+if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
   echo 'repository cache is empty, initializing it...'
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_SHA"  git@github.com:${GITHUB_REPOSITORY}.git .
-
+  # Check if directory is empty before cloning
+  if [ "$(ls -A "$WORKING_DIRECTORY")" ]; then
+    echo "Directory is not empty, initializing git repository locally"
+    git init
+    git config merge.directoryRenames false
+    git remote add origin git@github.com:${GITHUB_REPOSITORY}.git
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_HEAD_REF" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
+  else
+    # Directory is empty, safe to clone
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF" git@github.com:${GITHUB_REPOSITORY}.git .
+  fi
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
 else
   echo 'repository cache is already present, updating sources...'
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $GITHUB_SHA
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $GITHUB_HEAD_REF
 fi
 
 echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE
@@ -59,12 +69,23 @@ echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REP
 ### For Pull Request workflows in GitHub Actions, we need to test the merge result
 ### This is similar to GitLab's merged results pipelines
 if [ $GITHUB_BASE_REF ]; then
-  # Call init-merge-result-pipeline.sh with the absolute path and pass working directory
-  "$SCRIPT_DIR/init-merge-result-pipeline.sh" "$WORKING_DIRECTORY" "$SSH_SOCK"
+
+  # Git fetch the target branch to allow nx making the diff
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $GITHUB_BASE_REF:refs/remotes/origin/$GITHUB_BASE_REF
+
+  # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
+  PR_NUMBER=$(echo $GITHUB_REF | sed 's/refs\/pull\/\([0-9]*\)\/merge/\1/')
+
+  # Fetch the PR merge reference
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin pull/$PR_NUMBER/merge:pr-merge
+
+  # Check out the merge reference to be sure to test over it
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout pr-merge
+
 fi
 
 # Call init-cache.sh with the absolute path and pass working directory
 "$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
 
 # Immediately delete all identities
-#SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
+SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
