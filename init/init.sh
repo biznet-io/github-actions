@@ -37,6 +37,7 @@ else
   DEFAULT_BRANCH="main"
 fi
 
+echo "GITHUB_REF_TYPE: $GITHUB_REF_TYPE"
 if [ "$GITHUB_REF_TYPE" != "tag" ]; then
   echo "Setting default branch to: $DEFAULT_BRANCH"
   git config --global init.defaultBranch "$DEFAULT_BRANCH"
