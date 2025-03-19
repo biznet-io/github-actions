@@ -37,8 +37,10 @@ else
   DEFAULT_BRANCH="main"
 fi
 
-echo "Setting default branch to: $DEFAULT_BRANCH"
-git config --global init.defaultBranch "$DEFAULT_BRANCH"
+if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+  echo "Setting default branch to: $DEFAULT_BRANCH"
+  git config --global init.defaultBranch "$DEFAULT_BRANCH"
+fi
 
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
 
