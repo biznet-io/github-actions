@@ -42,10 +42,20 @@ else
   echo "No init repository pipeline id variable found"
 fi
 
-if [ "$(git remote | grep origin)" != "origin" ]; then
+if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
   echo 'repository cache is empty, initializing it...'
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF"  git@github.com:${GITHUB_REPOSITORY}.git .
-
+  # Check if directory is empty before cloning
+  if [ "$(ls -A "$WORKING_DIRECTORY")" ]; then
+    echo "Directory is not empty, initializing git repository locally"
+    git init
+    git config merge.directoryRenames false
+    git remote add origin git@github.com:${GITHUB_REPOSITORY}.git
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_HEAD_REF" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
+  else
+    # Directory is empty, safe to clone
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF" git@github.com:${GITHUB_REPOSITORY}.git .
+  fi
   git config merge.directoryRenames false
   SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
 else
@@ -78,4 +88,4 @@ fi
 "$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
 
 # Immediately delete all identities
-#SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
+SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
