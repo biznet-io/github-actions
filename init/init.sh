@@ -86,7 +86,7 @@ echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REP
 if [ $GITHUB_BASE_REF ]; then
 
   # Git fetch the target branch to allow nx making the diff
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $GITHUB_BASE_REF:refs/remotes/origin/$GITHUB_BASE_REF
+  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH
 
   # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
   PR_NUMBER=$(echo $GITHUB_REF | sed 's/refs\/pull\/\([0-9]*\)\/merge/\1/')
