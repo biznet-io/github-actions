@@ -1,13 +1,13 @@
 export interface ActionInputs {
-  path: string;
+  path: string
 }
 
 export interface WorkingDirectoryConfig {
-  basePath: string;
-  repository: string;
-  ref: string;
+  basePath: string
+  repository: string
+  ref: string
 }
 
 export interface ActionOutputs {
-  workingDirectory: string;
+  workingDirectory: string
 }
