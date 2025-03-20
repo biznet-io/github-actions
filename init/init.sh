@@ -128,6 +128,7 @@ else
       TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
       echo "Checking out tag: $TAG_NAME"
       SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
+    fi
   else
     echo "Resetting to branch: $DEFAULT_BRANCH"
     SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $DEFAULT_BRANCH
