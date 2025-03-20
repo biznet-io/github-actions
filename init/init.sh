@@ -71,8 +71,18 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
     # Handle different reference types (branch, tag, etc.)
     if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
       echo "Checking out tag: $GITHUB_REF_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+      # Ensure we have a valid ref name for the tag
+      if [[ -n "$GITHUB_REF_NAME" ]]; then
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+      else
+        echo "Error: Empty tag name detected. Using GITHUB_REF instead."
+        # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
+        TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+        echo "Using tag: $TAG_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$TAG_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
+      fi
     else
       echo "Checking out branch: $GITHUB_HEAD_REF"
       SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_HEAD_REF" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
@@ -80,10 +90,21 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
   else
     echo "Directory is empty, safe to clone"
     if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-      echo "Cloning repository and checking out tag: $GITHUB_REF_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git .
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+      # Ensure we have a valid ref name for the tag
+      if [[ -n "$GITHUB_REF_NAME" ]]; then
+        echo "Cloning repository and checking out tag: $GITHUB_REF_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git .
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+      else
+        echo "Error: Empty tag name detected. Using GITHUB_REF instead."
+        # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
+        TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+        echo "Cloning repository and checking out tag: $TAG_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git .
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$TAG_NAME"
+        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
+      fi
     else
       echo "Cloning repository and checking out branch: $GITHUB_HEAD_REF"
       SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF" git@github.com:${GITHUB_REPOSITORY}.git .
@@ -97,8 +118,16 @@ else
   
   # For tags, checkout the specific tag, otherwise reset to branch
   if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-    echo "Checking out tag: $GITHUB_REF_NAME"
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+    # Ensure we have a valid ref name for the tag
+    if [[ -n "$GITHUB_REF_NAME" ]]; then
+      echo "Checking out tag: $GITHUB_REF_NAME"
+      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
+    else
+      echo "Error: Empty tag name detected. Using GITHUB_REF instead."
+      # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
+      TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+      echo "Checking out tag: $TAG_NAME"
+      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
   else
     echo "Resetting to branch: $DEFAULT_BRANCH"
     SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $DEFAULT_BRANCH
