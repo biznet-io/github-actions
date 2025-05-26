@@ -84,8 +84,8 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
         SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
       fi
     else
-      echo "Checking out branch: $GITHUB_HEAD_REF"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_HEAD_REF" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$GITHUB_HEAD_REF"
+      echo "Checking out branch: $DEFAULT_BRANCH"
+      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$DEFAULT_BRANCH" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$DEFAULT_BRANCH"
     fi
   else
     echo "Directory is empty, safe to clone"
@@ -106,8 +106,8 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
         SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
       fi
     else
-      echo "Cloning repository and checking out branch: $GITHUB_HEAD_REF"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$GITHUB_HEAD_REF" git@github.com:${GITHUB_REPOSITORY}.git .
+      echo "Cloning repository and checking out branch: $DEFAULT_BRANCH"
+      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$DEFAULT_BRANCH" git@github.com:${GITHUB_REPOSITORY}.git .
     fi
   fi
   git config merge.directoryRenames false
@@ -130,8 +130,10 @@ else
       SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
     fi
   else
-    echo "Resetting to branch: $DEFAULT_BRANCH"
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard $DEFAULT_BRANCH
+    echo "Checking out and resetting to branch: $DEFAULT_BRANCH"
+    # First checkout the branch (create if needed), then reset
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f  "$DEFAULT_BRANCH"
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard "origin/$DEFAULT_BRANCH"
   fi
 fi
 
