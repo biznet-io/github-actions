@@ -444,11 +444,9 @@ main() {
     save_pipeline_id
     
     # Run additional cache initialization
-    if [[ -f "./init-cache.sh" ]]; then
-        start_group "Cache Initialization"
-        run_cache_initialization
-        end_group
-    fi
+    start_group "Cache Initialization"
+    run_cache_initialization
+    end_group
     
     # Set outputs for subsequent steps
     set_output "working-directory" "$WORKING_DIRECTORY"
