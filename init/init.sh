@@ -381,6 +381,7 @@ set_output() {
 
 # Add step summary
 add_step_summary() {
+    local start_timestamp="$1"
     if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         cat >> "$GITHUB_STEP_SUMMARY" << EOF
 ## 🚀 Repository Initialization Summary
@@ -390,6 +391,7 @@ add_step_summary() {
 - **Branch/Tag**: \`${WORKING_BRANCH}\` (${GITHUB_REF_TYPE:-branch})
 - **Event**: \`${GITHUB_EVENT_NAME:-}\`
 - **Run ID**: \`${GITHUB_RUN_ID}\`
+- **Start Time**: $(date -d "@$start_timestamp" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -r "$start_timestamp" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$start_timestamp")
 
 ### Git Information
 - **Commit SHA**: \`$(git rev-parse HEAD 2>/dev/null || echo "N/A")\`
@@ -454,7 +456,7 @@ main() {
     set_output "git-sha" "$(git rev-parse HEAD 2>/dev/null || echo '')"
     
     # Add summary
-    add_step_summary
+    add_step_summary "$start_time"
     
     local end_time duration
     end_time=$(date +%s)
