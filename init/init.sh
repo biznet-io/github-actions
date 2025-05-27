@@ -1,164 +1,468 @@
 #!/bin/bash
 
-WORKING_DIRECTORY=$1
-mkdir -p $WORKING_DIRECTORY
-cd $WORKING_DIRECTORY
-echo "WORKING_DIRECTORY:" $WORKING_DIRECTORY
-# Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-echo "SCRIPT_DIR:" $SCRIPT_DIR
+# Exit on any error, undefined variable, or pipe failure
+set -euo pipefail
 
-# Create unique, secure socket
-SSH_SOCK=$(mktemp -u)
+# Enable debug mode if DEBUG is set or GitHub Actions debug is enabled
+[[ "${DEBUG:-}" == "true" || "${RUNNER_DEBUG:-}" == "1" ]] && set -x
 
-# Start SSH agent with unique socket
-ssh-agent -a "$SSH_SOCK" > /dev/null
+# Constants
+readonly INIT_REPOSITORY_PIPELINE_ID_ENV_FILE="${INIT_REPOSITORY_PIPELINE_ID_ENV_FILE:-pipeline_id.env}"
 
-# Configure strict SSH settings
-mkdir -p ~/.ssh
-ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+# Global variables
+WORKING_DIRECTORY=""
+SSH_SOCK=""
+WORKING_BRANCH=""
 
-# Add SSH key with strict permissions
-SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}"
+# Cleanup function to be called on exit
+cleanup() {
+    local exit_code=$?
+    if [[ -n "${SSH_SOCK:-}" && -S "$SSH_SOCK" ]]; then
+        echo "🧹 Cleaning up SSH agent..."
+        SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D 2>/dev/null || true
+        ssh-agent -k 2>/dev/null || true
+    fi
+    exit $exit_code
+}
 
-echo "Init repo"
-git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-git config --global user.name "${GITHUB_ACTOR}"
+# Set up cleanup trap
+trap cleanup EXIT INT TERM
 
-# Determine default branch based on GitHub event
-if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-  # For pull requests, use the base branch
-  DEFAULT_BRANCH="$GITHUB_BASE_REF"
-elif [[ -n "$GITHUB_REF_NAME" ]]; then
-  # For pushes or other events with a ref
-  DEFAULT_BRANCH="$GITHUB_REF_NAME"
-else
-  # Fallback to main
-  DEFAULT_BRANCH="main"
-fi
+# GitHub Actions logging functions
+log_info() {
+    echo "ℹ️  $*"
+}
 
-echo "GITHUB_REF_TYPE: $GITHUB_REF_TYPE"
-echo "Setting default branch to: $DEFAULT_BRANCH"
-git config --global init.defaultBranch "$DEFAULT_BRANCH"
+log_error() {
+    echo "::error::$*" >&2
+    echo "❌ ERROR: $*" >&2
+}
 
-export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
+log_warning() {
+    echo "::warning::$*"
+    echo "⚠️  WARNING: $*"
+}
 
-if [ -f "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE" ]; then
-  source $WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE
-  if [ $INIT_REPOSITORY_PIPELINE_ID == $GITHUB_RUN_ID ]; then
-    echo "Job has been manually re-run, removing repository cache"
-    cd $WORKING_DIRECTORY/..
-    rm -Rf $WORKING_DIRECTORY/
-    mkdir -p $WORKING_DIRECTORY
-    cd $WORKING_DIRECTORY
-  else
-    echo "Job has been automatically executed, keeping repository cache"
-  fi
-else
-  echo "No init repository pipeline id variable found"
-fi
+log_success() {
+    echo "✅ $*"
+}
 
-if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
-  echo 'repository cache is empty, initializing it...'
-  # Check if directory is empty before cloning
-  if [ "$(ls -A "$WORKING_DIRECTORY")" ]; then
-    echo "Directory is not empty, initializing git repository locally"
-    git init
-    git config merge.directoryRenames false
-    git remote add origin git@github.com:${GITHUB_REPOSITORY}.git
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin
+log_debug() {
+    if [[ "${DEBUG:-}" == "true" || "${RUNNER_DEBUG:-}" == "1" ]]; then
+        echo "::debug::$*"
+        echo "🐛 DEBUG: $*"
+    fi
+}
+
+# GitHub Actions grouping
+start_group() {
+    echo "::group::$1"
+}
+
+end_group() {
+    echo "::endgroup::"
+}
+
+# Validation functions
+validate_environment() {
+    local required_vars=(
+        "GITHUB_REPOSITORY"
+        "GITHUB_ACTOR"
+        "GITHUB_RUN_ID"
+        "SSH_PRIVATE_KEY"
+    )
     
-    # Handle different reference types (branch, tag, etc.)
-    if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-      echo "Checking out tag: $GITHUB_REF_NAME"
-      # Ensure we have a valid ref name for the tag
-      if [[ -n "$GITHUB_REF_NAME" ]]; then
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
-      else
-        echo "Error: Empty tag name detected. Using GITHUB_REF instead."
-        # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
-        TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-        echo "Using tag: $TAG_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$TAG_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
-      fi
-    else
-      echo "Checking out branch: $DEFAULT_BRANCH"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$DEFAULT_BRANCH" || SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f -b "$DEFAULT_BRANCH"
+    log_debug "Validating GitHub Actions environment..."
+    log_debug "GITHUB_EVENT_NAME: ${GITHUB_EVENT_NAME:-}"
+    log_debug "GITHUB_REF: ${GITHUB_REF:-}"
+    log_debug "GITHUB_REF_NAME: ${GITHUB_REF_NAME:-}"
+    log_debug "GITHUB_REF_TYPE: ${GITHUB_REF_TYPE:-}"
+    log_debug "GITHUB_BASE_REF: ${GITHUB_BASE_REF:-}"
+    log_debug "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
+    
+    for var in "${required_vars[@]}"; do
+        if [[ -z "${!var:-}" ]]; then
+            log_error "Required environment variable $var is not set"
+            return 1
+        fi
+    done
+    
+    # Validate GitHub context
+    if [[ ! "${GITHUB_REPOSITORY:-}" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+        log_error "Invalid GITHUB_REPOSITORY format: ${GITHUB_REPOSITORY:-}"
+        return 1
     fi
-  else
-    echo "Directory is empty, safe to clone"
-    if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-      # Ensure we have a valid ref name for the tag
-      if [[ -n "$GITHUB_REF_NAME" ]]; then
-        echo "Cloning repository and checking out tag: $GITHUB_REF_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git .
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$GITHUB_REF_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
-      else
-        echo "Error: Empty tag name detected. Using GITHUB_REF instead."
-        # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
-        TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-        echo "Cloning repository and checking out tag: $TAG_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone git@github.com:${GITHUB_REPOSITORY}.git .
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin tag "$TAG_NAME"
-        SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
-      fi
-    else
-      echo "Cloning repository and checking out branch: $DEFAULT_BRANCH"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git clone --depth 1 --branch "$DEFAULT_BRANCH" git@github.com:${GITHUB_REPOSITORY}.git .
+}
+
+validate_working_directory() {
+    if [[ -z "$WORKING_DIRECTORY" ]]; then
+        log_error "Working directory parameter is required"
+        return 1
     fi
-  fi
-  git config merge.directoryRenames false
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
-else
-  echo 'repository cache is already present, updating sources...'
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch --tags --force
-  
-  # For tags, checkout the specific tag, otherwise reset to branch
-  if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-    # Ensure we have a valid ref name for the tag
-    if [[ -n "$GITHUB_REF_NAME" ]]; then
-      echo "Checking out tag: $GITHUB_REF_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$GITHUB_REF_NAME"
-    else
-      echo "Error: Empty tag name detected. Using GITHUB_REF instead."
-      # Extract tag name from GITHUB_REF (format: refs/tags/NAME)
-      TAG_NAME=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-      echo "Checking out tag: $TAG_NAME"
-      SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f "$TAG_NAME"
+    
+    if [[ ! "$WORKING_DIRECTORY" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+        log_error "Working directory contains invalid characters"
+        return 1
     fi
-  else
-    echo "Checking out and resetting to branch: $DEFAULT_BRANCH"
-    # First checkout the branch (create if needed), then reset
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout -f  "$DEFAULT_BRANCH"
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git reset --hard "origin/$DEFAULT_BRANCH"
-  fi
-fi
+}
 
-echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > $WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE
+# SSH setup functions
+setup_ssh() {
+    start_group "Setting up SSH authentication"
+    
+    # Create unique, secure socket
+    SSH_SOCK=$(mktemp -u)
+    log_debug "Created SSH socket: $SSH_SOCK"
+    
+    # Start SSH agent with unique socket
+    if ! ssh-agent -a "$SSH_SOCK" > /dev/null; then
+        log_error "Failed to start SSH agent"
+        end_group
+        return 1
+    fi
+    log_debug "SSH agent started successfully"
+    
+    # Configure SSH directory and known hosts
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    
+    # Add GitHub to known hosts with timeout
+    if ! timeout 30 ssh-keyscan -H github.com >> ~/.ssh/known_hosts; then
+        log_error "Failed to add GitHub to known hosts (timeout or connection failure)"
+        end_group
+        return 1
+    fi
+    log_debug "GitHub added to known hosts"
+    
+    # Add SSH key with strict permissions
+    if ! SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}" 2>/dev/null; then
+        log_error "Failed to add SSH key (check key format and permissions)"
+        end_group
+        return 1
+    fi
+    
+    log_success "SSH authentication configured"
+    end_group
+}
 
-### For Pull Request workflows in GitHub Actions, we need to test the merge result
-### This is similar to GitLab's merged results pipelines
-if [ $GITHUB_BASE_REF ]; then
+# Git configuration functions
+configure_git() {
+    log_info "Configuring Git..."
+    
+    git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+    git config --global user.name "${GITHUB_ACTOR}"
+    git config --global merge.directoryRenames false
+    
+    log_success "Git configured"
+}
 
-  # Git fetch the target branch to allow nx making the diff
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin $DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH
+determine_working_branch() {
+    log_info "Determining working branch..."
+    
+    if [[ "${GITHUB_EVENT_NAME:-}" == "pull_request" ]]; then
+        # For pull requests, use the base branch
+        WORKING_BRANCH="${GITHUB_BASE_REF:-main}"
+        log_info "Pull request detected, using base branch: $WORKING_BRANCH"
+    elif [[ -n "${GITHUB_REF_NAME:-}" ]]; then
+        # For pushes or other events with a ref
+        WORKING_BRANCH="$GITHUB_REF_NAME"
+        log_info "Using ref name: $WORKING_BRANCH"
+    else
+        # Fallback to main
+        log_error "No specific branch detected"
+        return 1
+    fi
+    
+    log_info "GITHUB_REF_TYPE: ${GITHUB_REF_TYPE:-}"
+    log_success "Working branch set to: $WORKING_BRANCH"
+}
 
-  # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
-  PR_NUMBER=$(echo $GITHUB_REF | sed 's/refs\/pull\/\([0-9]*\)\/merge/\1/')
+# Cache management functions
+check_repository_cache() {
+    local pipeline_file="$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE"
+    
+    if [[ -f "$pipeline_file" ]]; then
+        source "$pipeline_file"
+        if [[ "${INIT_REPOSITORY_PIPELINE_ID:-}" == "$GITHUB_RUN_ID" ]]; then
+            log_info "Manual re-run detected, clearing repository cache..."
+            cd "$WORKING_DIRECTORY/.."
+            rm -rf "$WORKING_DIRECTORY"
+            mkdir -p "$WORKING_DIRECTORY"
+            cd "$WORKING_DIRECTORY"
+            return 0
+        else
+            log_info "Automatic execution detected, keeping repository cache"
+            return 1
+        fi
+    else
+        log_info "No pipeline ID file found, treating as fresh run"
+        return 0
+    fi
+}
 
-  # Fetch the PR merge reference
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git fetch origin pull/$PR_NUMBER/merge:pr-merge
+# Git operations with SSH
+git_with_ssh() {
+    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git "$@"
+}
 
-  # Check out the merge reference to be sure to test over it
-  SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git checkout pr-merge
+# Repository initialization functions
+clone_repository() {
+    log_info "Cloning repository..."
+    
+    if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+        local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
+        if [[ -z "$tag_name" ]]; then
+            log_error "Cannot determine tag name"
+            return 1
+        fi
+        
+        log_info "Cloning and checking out tag: $tag_name"
+        git_with_ssh clone "git@github.com:${GITHUB_REPOSITORY}.git" .
+        git_with_ssh fetch origin tag "$tag_name"
+        git_with_ssh checkout -f "$tag_name"
+    else
+        log_info "Cloning and checking out branch: $WORKING_BRANCH"
+        git_with_ssh clone --depth 1 --branch "$WORKING_BRANCH" "git@github.com:${GITHUB_REPOSITORY}.git" .
+    fi
+    
+    log_success "Repository cloned successfully"
+}
 
-fi
+initialize_existing_directory() {
+    log_info "Initializing Git in existing directory..."
+    
+    git init
+    git_with_ssh remote add origin "git@github.com:${GITHUB_REPOSITORY}.git"
+    git_with_ssh fetch origin
+    
+    if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+        local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
+        if [[ -z "$tag_name" ]]; then
+            log_error "Cannot determine tag name"
+            return 1
+        fi
+        
+        log_info "Checking out tag: $tag_name"
+        git_with_ssh fetch origin tag "$tag_name"
+        git_with_ssh checkout -f "$tag_name"
+    else
+        log_info "Checking out branch: $WORKING_BRANCH"
+        if ! git_with_ssh checkout -f "$WORKING_BRANCH"; then
+            git_with_ssh checkout -f -b "$WORKING_BRANCH"
+        fi
+    fi
+    
+    log_success "Existing directory initialized"
+}
 
-# Call init-cache.sh with the absolute path and pass working directory
-"$SCRIPT_DIR/init-cache.sh" "$WORKING_DIRECTORY"
+update_existing_repository() {
+    log_info "Updating existing repository..."
+    
+    git_with_ssh fetch --tags --force
+    
+    if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+        local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
+        if [[ -z "$tag_name" ]]; then
+            log_error "Cannot determine tag name"
+            return 1
+        fi
+        
+        log_info "Checking out tag: $tag_name"
+        git_with_ssh checkout -f "$tag_name"
+    else
+        log_info "Checking out and resetting to branch: $WORKING_BRANCH"
+        git_with_ssh checkout -f "$WORKING_BRANCH"
+        git_with_ssh reset --hard "origin/$WORKING_BRANCH"
+    fi
+    
+    log_success "Repository updated"
+}
 
-# Immediately delete all identities
-SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D
+setup_repository() {
+    log_info "Setting up repository in: $WORKING_DIRECTORY"
+    
+    # Enable git discovery across filesystem
+    export GIT_DISCOVERY_ACROSS_FILESYSTEM=true
+    
+    # Set Git terminal prompt to avoid issues in CI
+    export GIT_TERMINAL_PROMPT=0
+    
+    # Check if we need to clear cache
+    local cache_cleared=false
+    if check_repository_cache; then
+        cache_cleared=true
+    fi
+    
+    if [[ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]] || [[ "$cache_cleared" == "true" ]]; then
+        log_info "Repository cache is empty, initializing..."
+        
+        if [[ -n "$(ls -A "$WORKING_DIRECTORY" 2>/dev/null)" ]]; then
+            log_info "Directory is not empty, initializing Git repository locally"
+            initialize_existing_directory
+        else
+            log_info "Directory is empty, safe to clone"
+            clone_repository
+        fi
+    else
+        log_info "Repository cache exists, updating sources..."
+        update_existing_repository
+    fi
+    
+    # Configure merge settings
+    git config merge.directoryRenames false
+    git_with_ssh fetch --tags --force
+}
+
+handle_pull_request() {
+    if [[ -z "${GITHUB_BASE_REF:-}" ]]; then
+        return 0
+    fi
+    
+    log_info "Handling pull request workflow..."
+    
+    # Fetch the target branch for diff calculations
+    git_with_ssh fetch origin "$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"
+    
+    # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
+    # BASH_REMATCH[0] = full match, BASH_REMATCH[1] = first capture group
+    local pr_number
+    if [[ "${GITHUB_REF:-}" =~ refs/pull/([0-9]+)/merge ]]; then
+        pr_number="${BASH_REMATCH[1]}"  # Extract PR number from capture group
+        log_debug "Extracted PR number: $pr_number from GITHUB_REF: ${GITHUB_REF:-}"
+    else
+        log_error "Cannot extract PR number from GITHUB_REF: ${GITHUB_REF:-}"
+        log_error "Expected format: refs/pull/NUMBER/merge"
+        return 1
+    fi
+    
+    log_info "Processing PR #$pr_number"
+    
+    # Fetch the PR merge reference
+    git_with_ssh fetch origin "pull/$pr_number/merge:pr-merge"
+    
+    # Check out the merge reference to test the merged result
+    git_with_ssh checkout pr-merge
+    
+    log_success "Pull request merge reference checked out"
+}
+
+save_pipeline_id() {
+    echo "INIT_REPOSITORY_PIPELINE_ID=$GITHUB_RUN_ID" > "$WORKING_DIRECTORY/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE"
+    log_success "Pipeline ID saved"
+}
+
+run_cache_initialization() {
+    local cache_script="./init-cache.sh"
+    
+    if [[ -f "$cache_script" ]]; then
+        log_info "Running cache initialization..."
+        if ! "$cache_script" "$WORKING_DIRECTORY"; then
+            log_error "Cache initialization failed"
+            return 1
+        fi
+        log_success "Cache initialization completed"
+    else
+        log_info "Cache initialization script not found, skipping"
+    fi
+}
+
+# Set GitHub Actions outputs
+set_output() {
+    local name="$1"
+    local value="$2"
+    
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+        echo "$name=$value" >> "$GITHUB_OUTPUT"
+        log_debug "Set output: $name=$value"
+    else
+        log_warning "GITHUB_OUTPUT not available, cannot set output: $name=$value"
+    fi
+}
+
+# Add step summary
+add_step_summary() {
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        cat >> "$GITHUB_STEP_SUMMARY" << EOF
+## 🚀 Repository Initialization Summary
+
+- **Repository**: \`${GITHUB_REPOSITORY}\`
+- **Working Directory**: \`${WORKING_DIRECTORY}\`
+- **Branch/Tag**: \`${WORKING_BRANCH}\` (${GITHUB_REF_TYPE:-branch})
+- **Event**: \`${GITHUB_EVENT_NAME:-}\`
+- **Run ID**: \`${GITHUB_RUN_ID}\`
+
+### Git Information
+- **Commit SHA**: \`$(git rev-parse HEAD 2>/dev/null || echo "N/A")\`
+- **Commit Message**: $(git log -1 --pretty=format:"%s" 2>/dev/null || echo "N/A")
+
+✅ **Status**: Repository initialized successfully
+EOF
+        log_debug "Added step summary"
+    fi
+}
+
+# Main function
+main() {
+    local start_time
+    start_time=$(date +%s)
+    
+    start_group "🚀 Repository Initialization"
+    log_info "Starting repository initialization..."
+    
+    # Get working directory from first argument
+    WORKING_DIRECTORY="${1:-}"
+    
+    # Validate inputs
+    validate_environment
+    validate_working_directory
+    
+    # Create and navigate to working directory
+    mkdir -p "$WORKING_DIRECTORY"
+    cd "$WORKING_DIRECTORY"
+    log_info "Working directory: $WORKING_DIRECTORY"
+    
+    # Setup components
+    setup_ssh
+    configure_git
+    determine_working_branch
+    
+    # Setup repository
+    start_group "Repository Setup"
+    setup_repository
+    end_group
+    
+    # Handle pull request specifics
+    if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+        start_group "Pull Request Handling"
+        handle_pull_request
+        end_group
+    fi
+    
+    # Save pipeline state
+    save_pipeline_id
+    
+    # Run additional cache initialization
+    if [[ -f "./init-cache.sh" ]]; then
+        start_group "Cache Initialization"
+        run_cache_initialization
+        end_group
+    fi
+    
+    # Set outputs for subsequent steps
+    set_output "working-directory" "$WORKING_DIRECTORY"
+    set_output "working-branch" "$WORKING_BRANCH"
+    set_output "git-sha" "$(git rev-parse HEAD 2>/dev/null || echo '')"
+    
+    # Add summary
+    add_step_summary
+    
+    local end_time duration
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+    
+    log_success "🎉 Repository initialization completed successfully in ${duration}s!"
+    end_group
+}
+
+# Run main function with all arguments
+main "$@"
