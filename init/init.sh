@@ -364,6 +364,7 @@ run_cache_initialization() {
         log_success "Cache initialization completed"
     else
         log_info "Cache initialization script not found, skipping"
+        return 1
     fi
 }
 
