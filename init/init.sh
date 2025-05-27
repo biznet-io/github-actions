@@ -352,7 +352,7 @@ save_pipeline_id() {
 }
 
 run_cache_initialization() {
-    local cache_script="./init-cache.sh"
+    local cache_script="init-cache.sh"
     
     if [[ -f "$cache_script" ]]; then
         log_info "Running cache initialization..."
