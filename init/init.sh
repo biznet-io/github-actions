@@ -7,6 +7,7 @@ set -euo pipefail
 [[ "${DEBUG:-}" == "true" || "${RUNNER_DEBUG:-}" == "1" ]] && set -x
 
 # Constants
+readonly SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 readonly INIT_REPOSITORY_PIPELINE_ID_ENV_FILE="${INIT_REPOSITORY_PIPELINE_ID_ENV_FILE:-pipeline_id.env}"
 
 # Global variables
@@ -352,7 +353,7 @@ save_pipeline_id() {
 }
 
 run_cache_initialization() {
-    local cache_script="init-cache.sh"
+    local cache_script="$SCRIPT_DIR/init-cache.sh"
     
     if [[ -f "$cache_script" ]]; then
         log_info "Running cache initialization..."
@@ -444,9 +445,9 @@ main() {
     save_pipeline_id
     
     # Run additional cache initialization
-    start_group "Cache Initialization"
-    run_cache_initialization
-    end_group
+        start_group "Cache Initialization"
+        run_cache_initialization
+        end_group
     
     # Set outputs for subsequent steps
     set_output "working-directory" "$WORKING_DIRECTORY"
