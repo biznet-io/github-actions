@@ -1,0 +1,32 @@
+name: 'Docker Login'
+description: 'Login to Docker registry with automatic logout support'
+
+inputs:
+  registry:
+    description: 'Docker registry URL (defaults to Docker Hub if not specified)'
+    required: false
+    default: ''
+  username:
+    description: 'Username for Docker registry authentication'
+    required: true
+  password:
+    description: 'Password or token for Docker registry authentication'
+    required: true
+  logout:
+    description: 'Automatically logout at the end of the job'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Docker Login
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/docker-login.sh
+        ${{ github.action_path }}/docker-login.sh
+      env:
+        INPUT_REGISTRY: ${{ inputs.registry }}
+        INPUT_USERNAME: ${{ inputs.username }}
+        INPUT_PASSWORD: ${{ inputs.password }}
+        INPUT_LOGOUT: ${{ inputs.logout }}

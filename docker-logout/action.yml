@@ -1,0 +1,19 @@
+name: 'Docker Logout'
+description: 'Logout from Docker registry'
+
+inputs:
+  registry:
+    description: 'Docker registry URL to logout from (defaults to Docker Hub if not specified)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Docker Logout
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/docker-logout.sh
+        ${{ github.action_path }}/docker-logout.sh
+      env:
+        INPUT_REGISTRY: ${{ inputs.registry }}
