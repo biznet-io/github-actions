@@ -11,7 +11,12 @@ inputs:
     required: true
   password:
     description: 'Password or token for Docker registry authentication'
-    required: true
+    required: false
+    default: ''
+  password_base64:
+    description: 'Base64 encoded password (will be decoded before use) - useful for GCP service account keys'
+    required: false
+    default: ''
   logout:
     description: 'Automatically logout at the end of the job'
     required: false
@@ -29,4 +34,5 @@ runs:
         INPUT_REGISTRY: ${{ inputs.registry }}
         INPUT_USERNAME: ${{ inputs.username }}
         INPUT_PASSWORD: ${{ inputs.password }}
+        INPUT_PASSWORD_BASE64: ${{ inputs.password_base64 }}
         INPUT_LOGOUT: ${{ inputs.logout }}

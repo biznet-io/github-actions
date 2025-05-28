@@ -60,10 +60,32 @@ if [ -z "$INPUT_USERNAME" ]; then
     exit 1
 fi
 
-if [ -z "$INPUT_PASSWORD" ]; then
-    print_error "Password is required"
+# Handle password input - either direct password or base64 encoded
+DECODED_PASSWORD=""
+if [ -n "$INPUT_PASSWORD" ] && [ -n "$INPUT_PASSWORD_BASE64" ]; then
+    print_error "Cannot specify both 'password' and 'password_base64' inputs"
+    exit 1
+elif [ -n "$INPUT_PASSWORD" ]; then
+    DECODED_PASSWORD="$INPUT_PASSWORD"
+    print_info "Using direct password input"
+elif [ -n "$INPUT_PASSWORD_BASE64" ]; then
+    print_info "Using base64 encoded password input"
+    # Decode the base64 password
+    if DECODED_PASSWORD=$(echo "$INPUT_PASSWORD_BASE64" | base64 -d 2>/dev/null); then
+        print_info "✅ Successfully decoded base64 password"
+    else
+        print_error "❌ Failed to decode base64 password"
+        exit 1
+    fi
+else
+    print_error "Either 'password' or 'password_base64' input is required"
     exit 1
 fi
+
+# Mask both original and decoded passwords in logs for security
+echo "::add-mask::$INPUT_PASSWORD"
+echo "::add-mask::$INPUT_PASSWORD_BASE64"
+echo "::add-mask::$DECODED_PASSWORD"
 
 # Set registry (default to Docker Hub if not specified)
 REGISTRY=""
@@ -73,9 +95,6 @@ if [ -n "$INPUT_REGISTRY" ]; then
 else
     print_info "Target registry: Docker Hub (default)"
 fi
-
-# Mask password in logs for security
-echo "::add-mask::$INPUT_PASSWORD"
 
 # Check if Docker is available
 if ! command -v docker &> /dev/null; then
@@ -99,8 +118,8 @@ fi
 # Initialize login status
 LOGIN_SUCCESSFUL="false"
 
-# Perform the login
-if echo "$INPUT_PASSWORD" | $LOGIN_CMD --username "$INPUT_USERNAME" --password-stdin; then
+# Perform the login using the decoded password
+if echo "$DECODED_PASSWORD" | $LOGIN_CMD --username "$INPUT_USERNAME" --password-stdin; then
     print_info "✅ Successfully authenticated with $REGISTRY_NAME"
     LOGIN_SUCCESSFUL="true"
 else
@@ -131,5 +150,6 @@ echo ""
 echo "::group::Login Summary"
 echo "Registry: $REGISTRY_NAME"
 echo "Username: $INPUT_USERNAME"
+echo "Password Type: $([ -n "$INPUT_PASSWORD_BASE64" ] && echo "Base64 Encoded" || echo "Direct")"
 echo "Automatic Logout: $INPUT_LOGOUT"
 echo "::endgroup::"
