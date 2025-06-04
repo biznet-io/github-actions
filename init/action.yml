@@ -2,6 +2,9 @@ name: 'Repository Initialization'
 description: 'Initialize repository by checking out code and installing dependencies'
 
 inputs:
+  BRANCH:
+    description: 'The branch you want to work with, bypassing the automatic branch detection logic that normally determines the branch from GitHub context (like pull request base branch or current ref).'
+    required: false
   WORKING_DIRECTORY:
     description: 'The working directory to init the workflow in'
     required: true
@@ -11,4 +14,4 @@ runs:
   steps:
     - name: Init Repository
       shell: bash
-      run: ${{ github.action_path }}/init.sh ${{ inputs.WORKING_DIRECTORY }}
+      run: ${{ github.action_path }}/init.sh ${{ inputs.WORKING_DIRECTORY }} ${{ inputs.BRANCH }}
