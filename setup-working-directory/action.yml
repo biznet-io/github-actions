@@ -6,6 +6,10 @@ inputs:
     description: 'Path where the working directory should be created'
     default: ''
     required: false
+  branch:
+    description: 'Branch name to use in the working directory path (defaults to GITHUB_REF if not provided)'
+    default: ''
+    required: false
 
 runs:
   using: 'composite'
@@ -13,7 +17,9 @@ runs:
     - id: set_working_directory
       shell: bash
       run: |
-        WORKING_DIRECTORY="${{ inputs.path || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/branches/${GITHUB_REF}"
+        # Use the branch input if provided, otherwise fallback to GITHUB_REF
+        BRANCH_NAME="${{ inputs.branch || env.GITHUB_REF }}"
+        WORKING_DIRECTORY="${{ inputs.path || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/branches/${BRANCH_NAME}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
