@@ -2,11 +2,11 @@ name: 'Setup Working Directory'
 description: 'Sets up the working directory for the job'
 
 inputs:
-  path:
+  PATH:
     description: 'Path where the working directory should be created'
     default: ''
     required: false
-  branch:
+  BRANCH:
     description: 'Branch name to use in the working directory path (defaults to GITHUB_REF if not provided)'
     default: ''
     required: false
@@ -18,8 +18,8 @@ runs:
       shell: bash
       run: |
         # Use the branch input if provided, otherwise fallback to GITHUB_REF
-        BRANCH_NAME="${{ inputs.branch || env.GITHUB_REF }}"
-        WORKING_DIRECTORY="${{ inputs.path || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/branches/${BRANCH_NAME}"
+        BRANCH_NAME="${{ inputs.BRANCH || env.GITHUB_REF }}"
+        WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/branches/${BRANCH_NAME}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
