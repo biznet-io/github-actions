@@ -30,3 +30,6 @@ runs:
 
         # Set as default working branch for following steps
         echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+
+        cd ${WORKING_DIRECTORY}
+        echo "Working directory is: $(pwd)"
