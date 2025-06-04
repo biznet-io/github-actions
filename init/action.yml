@@ -7,7 +7,7 @@ inputs:
     required: false
   WORKING_DIRECTORY:
     description: 'The working directory to init the workflow in'
-    required: true
+    required: false
 
 runs:
   using: 'composite'
