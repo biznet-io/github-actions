@@ -107,6 +107,18 @@ validate_working_directory() {
     fi
 }
 
+validate_working_branch() {
+    if [[ -n "$WORKING_BRANCH" ]]; then
+        # Validate branch name follows Git naming conventions
+        if [[ ! "$WORKING_BRANCH" =~ ^[a-zA-Z0-9._/-]+$ ]] || [[ "$WORKING_BRANCH" =~ ^\.|\.$ ]] || [[ "$WORKING_BRANCH" =~ \.\.|\.lock$ ]] || [[ "$WORKING_BRANCH" =~ ^/ ]] || [[ "$WORKING_BRANCH" =~ /$ ]]; then
+            log_error "Invalid branch name: $WORKING_BRANCH"
+            log_error "Branch names cannot start/end with '.', contain '..', end with '.lock', or start/end with '/'"
+            return 1
+        fi
+        log_debug "Branch name validation passed: $WORKING_BRANCH"
+    fi
+}
+
 # SSH setup functions
 setup_ssh() {
     start_group "Setting up SSH authentication"
@@ -384,13 +396,14 @@ set_output() {
 # Add step summary
 add_step_summary() {
     local start_timestamp="$1"
+    local branch_source="${2:-auto-detected}"
     if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         cat >> "$GITHUB_STEP_SUMMARY" << EOF
 ## 🚀 Repository Initialization Summary
 
 - **Repository**: \`${GITHUB_REPOSITORY}\`
 - **Working Directory**: \`${WORKING_DIRECTORY}\`
-- **Branch/Tag**: \`${WORKING_BRANCH}\` (${GITHUB_REF_TYPE:-branch})
+- **Branch/Tag**: \`${WORKING_BRANCH}\` (${GITHUB_REF_TYPE:-branch} - ${branch_source})
 - **Event**: \`${GITHUB_EVENT_NAME:-}\`
 - **Run ID**: \`${GITHUB_RUN_ID}\`
 - **Start Time**: $(date -d "@$start_timestamp" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -r "$start_timestamp" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$start_timestamp")
@@ -416,9 +429,19 @@ main() {
     # Get working directory from first argument
     WORKING_DIRECTORY="${1:-}"
     
+    # Get optional working branch from second argument
+    local provided_branch="${2:-}"
+    local branch_source="auto-detected"
+    if [[ -n "$provided_branch" ]]; then
+        WORKING_BRANCH="$provided_branch"
+        branch_source="manually provided"
+        log_info "Using provided working branch: $WORKING_BRANCH"
+    fi
+    
     # Validate inputs
     validate_environment
     validate_working_directory
+    validate_working_branch
     
     # Create and navigate to working directory
     mkdir -p "$WORKING_DIRECTORY"
@@ -428,7 +451,11 @@ main() {
     # Setup components
     setup_ssh
     configure_git
-    determine_working_branch
+    
+    # Determine working branch only if not provided as argument
+    if [[ -z "$WORKING_BRANCH" ]]; then
+        determine_working_branch
+    fi
     
     # Setup repository
     start_group "Repository Setup"
@@ -456,7 +483,7 @@ main() {
     set_output "git-sha" "$(git rev-parse HEAD 2>/dev/null || echo '')"
     
     # Add summary
-    add_step_summary "$start_time"
+    add_step_summary "$start_time" "$branch_source"
     
     local end_time duration
     end_time=$(date +%s)
