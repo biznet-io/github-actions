@@ -44,6 +44,3 @@ runs:
 
         # Set as default working directory for following steps
         echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> $GITHUB_ENV
-
-        cd ${WORKING_DIRECTORY}
-        echo "Working directory is: $(pwd)"
