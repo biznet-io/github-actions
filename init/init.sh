@@ -333,6 +333,9 @@ handle_pull_request() {
 
     log_info "Handling pull request workflow..."
 
+    # Fetch the target branch for diff calculations
+    git_with_ssh fetch origin "$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"
+
     # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
     # BASH_REMATCH[0] = full match, BASH_REMATCH[1] = first capture group
     local pr_number
