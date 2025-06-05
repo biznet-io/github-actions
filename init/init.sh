@@ -324,6 +324,36 @@ setup_repository() {
     # Configure merge settings
     git config merge.directoryRenames false
     git_with_ssh fetch --tags --force
+    
+    # CRITICAL: For PR contexts, ensure the base branch is available as remote tracking branch
+    # This must happen BEFORE any tools try to use origin/branch_name references
+    if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+        log_info "Ensuring base branch is available for PR context: $WORKING_BRANCH"
+        
+        # Fetch all branches to ensure we have complete remote references
+        git_with_ssh fetch origin
+        
+        # Explicitly ensure the base branch exists as a remote tracking branch
+        if ! git show-ref --verify --quiet "refs/remotes/origin/$WORKING_BRANCH"; then
+            log_info "Creating remote tracking branch for: $WORKING_BRANCH"
+            if git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"; then
+                log_success "Successfully created remote tracking branch: origin/$WORKING_BRANCH"
+            else
+                log_error "Failed to create remote tracking branch for: $WORKING_BRANCH"
+                log_info "Available remote branches:"
+                git branch -r
+            fi
+        else
+            log_info "Remote tracking branch already exists: origin/$WORKING_BRANCH"
+        fi
+        
+        # Verify the reference is accessible
+        if git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
+            log_success "Verified: origin/$WORKING_BRANCH is accessible"
+        else
+            log_error "Warning: origin/$WORKING_BRANCH is not accessible for diff operations"
+        fi
+    fi
 }
 
 handle_pull_request() {
@@ -332,12 +362,14 @@ handle_pull_request() {
     fi
 
     log_info "Handling pull request workflow..."
+    log_debug "GITHUB_BASE_REF: ${GITHUB_BASE_REF:-}"
+    log_debug "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
+    log_debug "WORKING_BRANCH: $WORKING_BRANCH"
 
     # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
-    # BASH_REMATCH[0] = full match, BASH_REMATCH[1] = first capture group
     local pr_number
     if [[ "${GITHUB_REF:-}" =~ refs/pull/([0-9]+)/merge ]]; then
-        pr_number="${BASH_REMATCH[1]}"  # Extract PR number from capture group
+        pr_number="${BASH_REMATCH[1]}"
         log_debug "Extracted PR number: $pr_number from GITHUB_REF: ${GITHUB_REF:-}"
     else
         log_error "Cannot extract PR number from GITHUB_REF: ${GITHUB_REF:-}"
@@ -346,38 +378,78 @@ handle_pull_request() {
     fi
 
     log_info "Processing PR #$pr_number"
+    
+    # Debug: Show current git state
+    log_debug "Current git status:"
+    git status --porcelain || true
+    log_debug "Current branches:"
+    git branch -a || true
+    log_debug "Current remotes:"
+    git remote -v || true
 
-    # Ensure we have the latest refs and fetch all necessary branches
+    # Ensure we have all the necessary remote references
+    log_info "Fetching all remote references..."
     git_with_ssh fetch origin
     
-    # Fetch the target branch explicitly to ensure it exists locally
-    # This ensures origin/$WORKING_BRANCH is available for diff operations
-    log_info "Fetching target branch: $WORKING_BRANCH"
-    if ! git_with_ssh fetch origin "$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
-        # If direct fetch fails, try fetching all refs and create the remote branch reference
-        log_warning "Direct branch fetch failed, trying alternative approach..."
-        git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" || {
-            log_error "Failed to fetch target branch: $WORKING_BRANCH"
-            return 1
-        }
+    # The key insight: in GitHub Actions PR context, we need to ensure that
+    # the base branch exists as a remote tracking branch that tools can reference
+    log_info "Setting up remote tracking branch for: $WORKING_BRANCH"
+    
+    # Method 1: Try to fetch the branch directly
+    if git_with_ssh fetch origin "$WORKING_BRANCH" 2>/dev/null; then
+        log_info "Successfully fetched branch: $WORKING_BRANCH"
+    else
+        log_warning "Direct fetch of $WORKING_BRANCH failed, trying alternatives..."
+    fi
+    
+    # Method 2: Ensure the remote tracking branch exists
+    # This is crucial for tools like NX that expect origin/branch_name to exist
+    if ! git rev-parse "refs/remotes/origin/$WORKING_BRANCH" >/dev/null 2>&1; then
+        log_info "Creating remote tracking branch: origin/$WORKING_BRANCH"
+        
+        # Try different approaches to create the remote tracking branch
+        if git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
+            log_success "Created remote tracking branch via explicit refspec"
+        elif git show-ref --verify --quiet "refs/remotes/origin/$WORKING_BRANCH"; then
+            log_info "Remote tracking branch already exists"
+        else
+            # Last resort: create a local branch and set up tracking
+            log_warning "Attempting to create local branch and set up tracking..."
+            if git_with_ssh checkout -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH" 2>/dev/null; then
+                git_with_ssh checkout -
+                log_info "Created local tracking branch"
+            else
+                log_error "All methods to create remote tracking branch failed"
+                log_info "Available remote branches:"
+                git branch -r
+                return 1
+            fi
+        fi
+    else
+        log_info "Remote tracking branch origin/$WORKING_BRANCH already exists"
     fi
 
     # Fetch the PR merge reference
+    log_info "Fetching PR merge reference..."
     git_with_ssh fetch origin "pull/$pr_number/merge:pr-merge"
 
     # Check out the merge reference to test the merged result
     git_with_ssh checkout pr-merge
-
-    # Verify that the remote branch reference exists for diff operations
-    if ! git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
-        log_error "Remote branch origin/$WORKING_BRANCH not found after fetch"
-        log_info "Available remote branches:"
+    
+    # Final verification
+    if git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
+        log_success "Pull request setup complete - origin/$WORKING_BRANCH is available"
+        log_debug "origin/$WORKING_BRANCH points to: $(git rev-parse origin/$WORKING_BRANCH)"
+    else
+        log_error "Failed to set up origin/$WORKING_BRANCH reference"
+        log_info "Current remote branches:"
         git branch -r
+        log_info "Attempting to show what exists:"
+        git show-ref | grep -E "(origin|$WORKING_BRANCH)" || echo "No matching refs found"
         return 1
     fi
 
-    log_success "Pull request merge reference checked out"
-    log_info "Remote branch origin/$WORKING_BRANCH is available for diff operations"
+    log_success "Pull request merge reference checked out successfully"
 }
 
 save_pipeline_id() {
