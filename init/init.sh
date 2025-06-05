@@ -429,6 +429,12 @@ handle_pull_request() {
         log_info "Remote tracking branch origin/$WORKING_BRANCH already exists"
     fi
 
+    # Clean up any existing pr-merge branch to handle re-runs
+    if git show-ref --verify --quiet refs/heads/pr-merge; then
+        log_info "Cleaning up existing pr-merge branch for re-run..."
+        git branch -D pr-merge 2>/dev/null || true
+    fi
+    
     # Fetch the PR merge reference
     log_info "Fetching PR merge reference..."
     git_with_ssh fetch origin "pull/$pr_number/merge:pr-merge"
