@@ -1,10 +1,8 @@
-description: Dummy description of the project, refer to docs for proper use.
+description: GitHub Actions repository for the Whoz organization. This project hosts reusable workflows and custom actions to standardize CI/CD processes across Whoz projects.
 mandatoryDocs: []
 optionalDocs: []
 scripts:
   example:
-    description: Dummy description of the example script so that the LLM can get a
-      grasp of what it does (so to understand when to use it), refer to docs for
-      proper use.
+    description: Demonstrates how to use a basic GitHub Action workflow from this repository in your project.
     command: echo "example script run with great success"
-    parametersDescription: Dummy description of parameters, refer to docs for proper use.
+    parametersDescription: No parameters required for this example script.

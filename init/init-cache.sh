@@ -34,8 +34,15 @@ function initializeYarnCache {
   local folder=$1
   local folderWithWorkingDirectory=$WORKING_DIRECTORY/$1
 
-  local yarnChecksum=yarn-$(sha1sum "$folderWithWorkingDirectory/yarn.lock" | awk '{print $1}')
-  local yarnCacheFolder="$FRAMEWORKS_CACHE_FOLDER/$yarnChecksum"
+  # Check if yarn.lock exists
+  if [ -f "$folderWithWorkingDirectory/yarn.lock" ]; then
+    local yarnChecksum=yarn-$(sha1sum "$folderWithWorkingDirectory/yarn.lock" | awk '{print $1}')
+    local yarnCacheFolder="$FRAMEWORKS_CACHE_FOLDER/$yarnChecksum"
+  else
+    echo "Warning: yarn.lock not found in $folderWithWorkingDirectory"
+    local yarnCacheFolder="$FRAMEWORKS_CACHE_FOLDER/yarn-default"
+    mkdir -p $yarnCacheFolder
+  fi
 
   symlink_target=$(readlink "$folderWithWorkingDirectory/node_modules")
 
@@ -54,7 +61,20 @@ function initializeYarnCache {
   fi
 
   cd $folderWithWorkingDirectory
-  yarn install --frozen-lockfile --no-progress --ignore-engines
+  
+  # Check if package.json exists
+  if [ -f "$folderWithWorkingDirectory/package.json" ]; then
+    # If yarn.lock exists, use frozen-lockfile
+    if [ -f "$folderWithWorkingDirectory/yarn.lock" ]; then
+      yarn install --frozen-lockfile --no-progress --ignore-engines
+    else
+      # Without yarn.lock, we can't use frozen-lockfile
+      echo "Installing dependencies without lockfile"
+      yarn install --no-progress --ignore-engines
+    fi
+  else
+    echo "Warning: package.json not found in $folderWithWorkingDirectory, skipping yarn install"
+  fi
 
   echo "yarn cache for ${folder:-"/"} is stored in $yarnCacheFolder"
   echo "YARN_CACHE_USED_AT=$(date +%F)" > $yarnCacheFolder/$INIT_REPOSITORY_PIPELINE_ID_ENV_FILE

@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "coday": "node ./node_modules/@biznet.io/coday-web/server/server.js --local --no_auth"
+  },
+  "dependencies": {
+    "@biznet.io/coday-web": "^0.11.0"
+  }
+}
