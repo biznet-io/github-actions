@@ -333,9 +333,6 @@ handle_pull_request() {
 
     log_info "Handling pull request workflow..."
 
-    # Fetch the target branch for diff calculations
-    git_with_ssh fetch origin "$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"
-
     # Extract PR number from GITHUB_REF (format: refs/pull/NUMBER/merge)
     # BASH_REMATCH[0] = full match, BASH_REMATCH[1] = first capture group
     local pr_number
@@ -350,13 +347,37 @@ handle_pull_request() {
 
     log_info "Processing PR #$pr_number"
 
+    # Ensure we have the latest refs and fetch all necessary branches
+    git_with_ssh fetch origin
+    
+    # Fetch the target branch explicitly to ensure it exists locally
+    # This ensures origin/$WORKING_BRANCH is available for diff operations
+    log_info "Fetching target branch: $WORKING_BRANCH"
+    if ! git_with_ssh fetch origin "$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
+        # If direct fetch fails, try fetching all refs and create the remote branch reference
+        log_warning "Direct branch fetch failed, trying alternative approach..."
+        git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" || {
+            log_error "Failed to fetch target branch: $WORKING_BRANCH"
+            return 1
+        }
+    fi
+
     # Fetch the PR merge reference
     git_with_ssh fetch origin "pull/$pr_number/merge:pr-merge"
 
     # Check out the merge reference to test the merged result
     git_with_ssh checkout pr-merge
 
+    # Verify that the remote branch reference exists for diff operations
+    if ! git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
+        log_error "Remote branch origin/$WORKING_BRANCH not found after fetch"
+        log_info "Available remote branches:"
+        git branch -r
+        return 1
+    fi
+
     log_success "Pull request merge reference checked out"
+    log_info "Remote branch origin/$WORKING_BRANCH is available for diff operations"
 }
 
 save_pipeline_id() {
