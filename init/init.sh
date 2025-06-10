@@ -284,7 +284,18 @@ update_existing_repository() {
         git_with_ssh checkout -f "$tag_name"
     else
         log_info "Checking out and resetting to branch: $WORKING_BRANCH"
-        git_with_ssh checkout -f "$WORKING_BRANCH"
+
+        # Check if the branch exists locally
+        if git show-ref --verify --quiet "refs/heads/$WORKING_BRANCH"; then
+            log_info "Local branch exists, checking out: $WORKING_BRANCH"
+            git_with_ssh checkout -f "$WORKING_BRANCH"
+        else
+            log_info "Local branch doesn't exist, creating from remote: $WORKING_BRANCH"
+            # Create local branch from remote if it doesn't exist
+            git_with_ssh checkout -f -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH"
+        fi
+        
+        # Reset to match remote
         git_with_ssh reset --hard "origin/$WORKING_BRANCH"
     fi
 
