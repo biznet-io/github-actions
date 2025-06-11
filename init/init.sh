@@ -217,7 +217,7 @@ initialize_existing_directory() {
 
 update_existing_repository() {
     log_info "Updating existing repository..."
-
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
     git fetch --tags --force
 
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
