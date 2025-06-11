@@ -12,22 +12,10 @@ readonly INIT_REPOSITORY_PIPELINE_ID_ENV_FILE="${INIT_REPOSITORY_PIPELINE_ID_ENV
 
 # Global variables
 WORKING_DIRECTORY=""
-SSH_SOCK=""
 WORKING_BRANCH=""
 
-# Cleanup function to be called on exit
-cleanup() {
-    local exit_code=$?
-    if [[ -n "${SSH_SOCK:-}" && -S "$SSH_SOCK" ]]; then
-        echo "🧹 Cleaning up SSH agent..."
-        SSH_AUTH_SOCK="$SSH_SOCK" ssh-add -D 2>/dev/null || true
-        ssh-agent -k 2>/dev/null || true
-    fi
-    exit $exit_code
-}
 
-# Set up cleanup trap
-trap cleanup EXIT INT TERM
+
 
 # GitHub Actions logging functions
 log_info() {
@@ -68,9 +56,8 @@ end_group() {
 validate_environment() {
     local required_vars=(
         "GITHUB_REPOSITORY"
-        "GITHUB_ACTOR"
         "GITHUB_RUN_ID"
-        "SSH_PRIVATE_KEY"
+        "GITHUB_TOKEN"
     )
 
     log_debug "Validating GitHub Actions environment..."
@@ -119,51 +106,14 @@ validate_working_branch() {
     fi
 }
 
-# SSH setup functions
-setup_ssh() {
-    start_group "Setting up SSH authentication"
 
-    # Create unique, secure socket
-    SSH_SOCK=$(mktemp -u)
-    log_debug "Created SSH socket: $SSH_SOCK"
-
-    # Start SSH agent with unique socket
-    if ! ssh-agent -a "$SSH_SOCK" > /dev/null; then
-        log_error "Failed to start SSH agent"
-        end_group
-        return 1
-    fi
-    log_debug "SSH agent started successfully"
-
-    # Configure SSH directory and known hosts
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
-
-    # Add GitHub to known hosts with timeout
-    if ! timeout 30 ssh-keyscan -H github.com >> ~/.ssh/known_hosts; then
-        log_error "Failed to add GitHub to known hosts (timeout or connection failure)"
-        end_group
-        return 1
-    fi
-    log_debug "GitHub added to known hosts"
-
-    # Add SSH key with strict permissions
-    if ! SSH_AUTH_SOCK="$SSH_SOCK" ssh-add - <<< "${SSH_PRIVATE_KEY}" 2>/dev/null; then
-        log_error "Failed to add SSH key (check key format and permissions)"
-        end_group
-        return 1
-    fi
-
-    log_success "SSH authentication configured"
-    end_group
-}
 
 # Git configuration functions
 configure_git() {
     log_info "Configuring Git..."
 
-    git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-    git config --global user.name "${GITHUB_ACTOR}"
+    git config --global user.email "github-actions@users.noreply.github.com"
+    git config --global user.name "github-actions"
     git config --global merge.directoryRenames false
 
     log_success "Git configured"
@@ -213,10 +163,7 @@ check_repository_cache() {
     fi
 }
 
-# Git operations with SSH
-git_with_ssh() {
-    SSH_AUTH_SOCK="$SSH_SOCK" GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" git "$@"
-}
+
 
 # Repository initialization functions
 clone_repository() {
@@ -230,12 +177,12 @@ clone_repository() {
         fi
 
         log_info "Cloning and checking out tag: $tag_name"
-        git_with_ssh clone "git@github.com:${GITHUB_REPOSITORY}.git" .
-        git_with_ssh fetch origin tag "$tag_name"
-        git_with_ssh checkout -f "$tag_name"
+        git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
+        git fetch origin tag "$tag_name"
+        git checkout -f "$tag_name"
     else
         log_info "Cloning and checking out branch: $WORKING_BRANCH"
-        git_with_ssh clone --depth 1 --branch "$WORKING_BRANCH" "git@github.com:${GITHUB_REPOSITORY}.git" .
+        git clone --depth 1 --branch "$WORKING_BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
     fi
 
     log_success "Repository cloned successfully"
@@ -245,8 +192,8 @@ initialize_existing_directory() {
     log_info "Initializing Git in existing directory..."
 
     git init
-    git_with_ssh remote add origin "git@github.com:${GITHUB_REPOSITORY}.git"
-    git_with_ssh fetch origin
+    git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+    git fetch origin
 
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
         local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
@@ -256,12 +203,12 @@ initialize_existing_directory() {
         fi
 
         log_info "Checking out tag: $tag_name"
-        git_with_ssh fetch origin tag "$tag_name"
-        git_with_ssh checkout -f "$tag_name"
+        git fetch origin tag "$tag_name"
+        git checkout -f "$tag_name"
     else
         log_info "Checking out branch: $WORKING_BRANCH"
-        if ! git_with_ssh checkout -f "$WORKING_BRANCH"; then
-            git_with_ssh checkout -f -b "$WORKING_BRANCH"
+        if ! git checkout -f "$WORKING_BRANCH"; then
+            git checkout -f -b "$WORKING_BRANCH"
         fi
     fi
 
@@ -271,7 +218,7 @@ initialize_existing_directory() {
 update_existing_repository() {
     log_info "Updating existing repository..."
 
-    git_with_ssh fetch --tags --force
+    git fetch --tags --force
 
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
         local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
@@ -281,22 +228,22 @@ update_existing_repository() {
         fi
 
         log_info "Checking out tag: $tag_name"
-        git_with_ssh checkout -f "$tag_name"
+        git checkout -f "$tag_name"
     else
         log_info "Checking out and resetting to branch: $WORKING_BRANCH"
 
         # Check if the branch exists locally
         if git show-ref --verify --quiet "refs/heads/$WORKING_BRANCH"; then
             log_info "Local branch exists, checking out: $WORKING_BRANCH"
-            git_with_ssh checkout -f "$WORKING_BRANCH"
+            git checkout -f "$WORKING_BRANCH"
         else
             log_info "Local branch doesn't exist, creating from remote: $WORKING_BRANCH"
             # Create local branch from remote if it doesn't exist
-            git_with_ssh checkout -f -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH"
+            git checkout -f -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH"
         fi
         
         # Reset to match remote
-        git_with_ssh reset --hard "origin/$WORKING_BRANCH"
+        git reset --hard "origin/$WORKING_BRANCH"
     fi
 
     log_success "Repository updated"
@@ -334,7 +281,7 @@ setup_repository() {
 
     # Configure merge settings
     git config merge.directoryRenames false
-    git_with_ssh fetch --tags --force
+    git fetch --tags --force
     
     # CRITICAL: For PR contexts, ensure the base branch is available as remote tracking branch
     # This must happen BEFORE any tools try to use origin/branch_name references
@@ -342,12 +289,12 @@ setup_repository() {
         log_info "Ensuring base branch is available for PR context: $WORKING_BRANCH"
         
         # Fetch all branches to ensure we have complete remote references
-        git_with_ssh fetch origin
+        git fetch origin
         
         # Explicitly ensure the base branch exists as a remote tracking branch
         if ! git show-ref --verify --quiet "refs/remotes/origin/$WORKING_BRANCH"; then
             log_info "Creating remote tracking branch for: $WORKING_BRANCH"
-            if git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"; then
+            if git fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH"; then
                 log_success "Successfully created remote tracking branch: origin/$WORKING_BRANCH"
             else
                 log_error "Failed to create remote tracking branch for: $WORKING_BRANCH"
@@ -400,14 +347,14 @@ handle_pull_request() {
 
     # Ensure we have all the necessary remote references
     log_info "Fetching all remote references..."
-    git_with_ssh fetch origin
+    git fetch origin
     
     # The key insight: in GitHub Actions PR context, we need to ensure that
     # the base branch exists as a remote tracking branch that tools can reference
     log_info "Setting up remote tracking branch for: $WORKING_BRANCH"
     
     # Method 1: Try to fetch the branch directly
-    if git_with_ssh fetch origin "$WORKING_BRANCH" 2>/dev/null; then
+    if git fetch origin "$WORKING_BRANCH" 2>/dev/null; then
         log_info "Successfully fetched branch: $WORKING_BRANCH"
     else
         log_warning "Direct fetch of $WORKING_BRANCH failed, trying alternatives..."
@@ -419,15 +366,15 @@ handle_pull_request() {
         log_info "Creating remote tracking branch: origin/$WORKING_BRANCH"
         
         # Try different approaches to create the remote tracking branch
-        if git_with_ssh fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
+        if git fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
             log_success "Created remote tracking branch via explicit refspec"
         elif git show-ref --verify --quiet "refs/remotes/origin/$WORKING_BRANCH"; then
             log_info "Remote tracking branch already exists"
         else
             # Last resort: create a local branch and set up tracking
             log_warning "Attempting to create local branch and set up tracking..."
-            if git_with_ssh checkout -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH" 2>/dev/null; then
-                git_with_ssh checkout -
+            if git checkout -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH" 2>/dev/null; then
+                git checkout -
                 log_info "Created local tracking branch"
             else
                 log_error "All methods to create remote tracking branch failed"
@@ -448,10 +395,10 @@ handle_pull_request() {
     
     # Fetch the PR merge reference
     log_info "Fetching PR merge reference..."
-    git_with_ssh fetch origin "pull/$pr_number/merge:pr-merge"
+    git fetch origin "pull/$pr_number/merge:pr-merge"
 
     # Check out the merge reference to test the merged result
-    git_with_ssh checkout pr-merge
+    git checkout pr-merge
     
     # Final verification
     if git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
@@ -559,7 +506,6 @@ main() {
     log_info "Working directory: $WORKING_DIRECTORY"
 
     # Setup components
-    setup_ssh
     configure_git
 
     # Determine working branch only if not provided as argument
