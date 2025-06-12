@@ -8,9 +8,7 @@ inputs:
   WORKING_DIRECTORY:
     description: 'The working directory to init the workflow in'
     required: false
-  GITHUB_TOKEN:
-    description: 'GitHub token for repository access'
-    required: false
+
 
 runs:
   using: 'composite'
@@ -18,5 +16,3 @@ runs:
     - name: Init Repository
       shell: bash
       run: ${{ github.action_path }}/init.sh ${{ inputs.WORKING_DIRECTORY || env.WORKING_DIRECTORY }} ${{ inputs.BRANCH_NAME || env.BRANCH_NAME }}
-      env:
-        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN || env.GITHUB_TOKEN }}
