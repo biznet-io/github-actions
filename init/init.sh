@@ -181,7 +181,7 @@ clone_repository() {
         git checkout -f "$tag_name"
     else
         log_info "Cloning and checking out branch: $WORKING_BRANCH"
-        git clone --depth 1 --branch "$WORKING_BRANCH" "git@github.com:${GITHUB_REPOSITORY}.git" .
+        git clone --branch "$WORKING_BRANCH" "git@github.com:${GITHUB_REPOSITORY}.git" .
     fi
 
     log_success "Repository cloned successfully"
