@@ -57,7 +57,6 @@ validate_environment() {
     local required_vars=(
         "GITHUB_REPOSITORY"
         "GITHUB_RUN_ID"
-        "GITHUB_TOKEN"
     )
 
     log_debug "Validating GitHub Actions environment..."
