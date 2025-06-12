@@ -176,12 +176,12 @@ clone_repository() {
         fi
 
         log_info "Cloning and checking out tag: $tag_name"
-        git clone git@github.com/${GITHUB_REPOSITORY}.git .
+        git clone git@github.com:${GITHUB_REPOSITORY}.git .
         git fetch origin tag "$tag_name"
         git checkout -f "$tag_name"
     else
         log_info "Cloning and checking out branch: $WORKING_BRANCH"
-        git clone --depth 1 --branch "$WORKING_BRANCH" "git@github.com/${GITHUB_REPOSITORY}.git" .
+        git clone --depth 1 --branch "$WORKING_BRANCH" "git@github.com:${GITHUB_REPOSITORY}.git" .
     fi
 
     log_success "Repository cloned successfully"
@@ -191,7 +191,7 @@ initialize_existing_directory() {
     log_info "Initializing Git in existing directory..."
 
     git init
-    git remote add origin "git@github.com/${GITHUB_REPOSITORY}.git"
+    git remote add origin "git@github.com:${GITHUB_REPOSITORY}.git"
     git fetch origin
 
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
