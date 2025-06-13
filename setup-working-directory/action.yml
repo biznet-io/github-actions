@@ -28,6 +28,8 @@ runs:
         if [[ -z "$BRANCH_NAME" ]]; then
           echo "No branch name provided, using GITHUB_REF: $GITHUB_REF"
           BRANCH_NAME=$GITHUB_REF
+        else
+          BRANCH_NAME=$("refs/heads/$BRANCH_NAME")
         fi
 
         # Sanitize workflow name for filesystem compatibility
