@@ -43,7 +43,7 @@ runs:
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
         echo "Original Branch Name: ${BRANCH_NAME}"
-        echo "WORKING_DIRECTORY: "${WORKING_DIRECTORY}"
+        echo "WORKING_DIRECTORY: ${WORKING_DIRECTORY}"
 
         # Set as default working directory for following steps
         echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> "${GITHUB_ENV}"
