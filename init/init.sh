@@ -216,7 +216,7 @@ initialize_existing_directory() {
 
 update_existing_repository() {
     log_info "Updating existing repository..."
-    git fetch --tags --force
+    git fetch --tags --force --prune --prune-tags
 
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
         local tag_name="${GITHUB_REF_NAME:-$(echo "${GITHUB_REF:-}" | sed 's/refs\/tags\///')}"
@@ -239,7 +239,7 @@ update_existing_repository() {
             # Create local branch from remote if it doesn't exist
             git checkout -f -b "$WORKING_BRANCH" "origin/$WORKING_BRANCH"
         fi
-        
+
         # Reset to match remote
         git reset --hard "origin/$WORKING_BRANCH"
     fi
@@ -280,15 +280,15 @@ setup_repository() {
     # Configure merge settings
     git config merge.directoryRenames false
     git fetch --tags --force
-    
+
     # CRITICAL: For PR contexts, ensure the base branch is available as remote tracking branch
     # This must happen BEFORE any tools try to use origin/branch_name references
     if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
         log_info "Ensuring base branch is available for PR context: $WORKING_BRANCH"
-        
+
         # Fetch all branches to ensure we have complete remote references
         git fetch origin
-        
+
         # Explicitly ensure the base branch exists as a remote tracking branch
         if ! git show-ref --verify --quiet "refs/remotes/origin/$WORKING_BRANCH"; then
             log_info "Creating remote tracking branch for: $WORKING_BRANCH"
@@ -302,7 +302,7 @@ setup_repository() {
         else
             log_info "Remote tracking branch already exists: origin/$WORKING_BRANCH"
         fi
-        
+
         # Verify the reference is accessible
         if git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
             log_success "Verified: origin/$WORKING_BRANCH is accessible"
@@ -334,7 +334,7 @@ handle_pull_request() {
     fi
 
     log_info "Processing PR #$pr_number"
-    
+
     # Debug: Show current git state
     log_debug "Current git status:"
     git status --porcelain || true
@@ -346,23 +346,23 @@ handle_pull_request() {
     # Ensure we have all the necessary remote references
     log_info "Fetching all remote references..."
     git fetch origin
-    
+
     # The key insight: in GitHub Actions PR context, we need to ensure that
     # the base branch exists as a remote tracking branch that tools can reference
     log_info "Setting up remote tracking branch for: $WORKING_BRANCH"
-    
+
     # Method 1: Try to fetch the branch directly
     if git fetch origin "$WORKING_BRANCH" 2>/dev/null; then
         log_info "Successfully fetched branch: $WORKING_BRANCH"
     else
         log_warning "Direct fetch of $WORKING_BRANCH failed, trying alternatives..."
     fi
-    
+
     # Method 2: Ensure the remote tracking branch exists
     # This is crucial for tools like NX that expect origin/branch_name to exist
     if ! git rev-parse "refs/remotes/origin/$WORKING_BRANCH" >/dev/null 2>&1; then
         log_info "Creating remote tracking branch: origin/$WORKING_BRANCH"
-        
+
         # Try different approaches to create the remote tracking branch
         if git fetch origin "+refs/heads/$WORKING_BRANCH:refs/remotes/origin/$WORKING_BRANCH" 2>/dev/null; then
             log_success "Created remote tracking branch via explicit refspec"
@@ -390,14 +390,14 @@ handle_pull_request() {
         log_info "Cleaning up existing pr-merge branch for re-run..."
         git branch -D pr-merge 2>/dev/null || true
     fi
-    
+
     # Fetch the PR merge reference
     log_info "Fetching PR merge reference..."
     git fetch origin "pull/$pr_number/merge:pr-merge"
 
     # Check out the merge reference to test the merged result
     git checkout pr-merge
-    
+
     # Final verification
     if git rev-parse "origin/$WORKING_BRANCH" >/dev/null 2>&1; then
         log_success "Pull request setup complete - origin/$WORKING_BRANCH is available"
