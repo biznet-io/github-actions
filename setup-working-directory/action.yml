@@ -27,8 +27,12 @@ runs:
           BRANCH_NAME=$("refs/heads/$BRANCH_NAME")
         fi  
         
+        # Sanitize workflow name for filesystem compatibility
+        WORKFLOW_NAME="${{ github.workflow }}"
+        WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+        
         # Create working directory with separated prefix and branch structure
-        WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${{ github.workflow_id }}/${BRANCH_NAME}"
+        WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${WORKFLOW_NAME}/${BRANCH_NAME}"
 
 
         # Make sure the directory exists
