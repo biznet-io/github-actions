@@ -177,7 +177,7 @@ install_plugin() {
 
     # Set global version
     log_info "Setting global version for $plugin_name to $plugin_version..."
-    asdf global "$plugin_name" "$plugin_version"
+    asdf set "$plugin_name" "$plugin_version"
 
     # Get installation path
     local install_path
