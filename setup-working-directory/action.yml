@@ -14,12 +14,12 @@ inputs:
 outputs:
   WORKING_DIRECTORY:
     description: 'The generated working directory'
-    value:  ${{ steps.set_working_directory.outputs.WORKING_DIRECTORY }}
+    value:  ${{ steps.set-working-directory.outputs.WORKING_DIRECTORY }}
 
 runs:
   using: 'composite'
   steps:
-    - id: set_working_directory
+    - id: set-working-directory
       shell: bash
       run: |
         # Use the branch input if provided, otherwise fallback to GITHUB_REF
