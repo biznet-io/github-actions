@@ -1,6 +1,6 @@
-name: Example - Setup ASDF Plugins (Agnostic)
+name: Example - Setup ASDF Plugins (Environment Variables Only)
 
-# Global environment variables for reusability
+# Global environment variables - define your tools once!
 env:
   ASDF_PLUGINS: |
     [
@@ -20,8 +20,8 @@ on:
       - 'setup-asdf-plugins/**'
 
 jobs:
-  test-env-variables:
-    name: Test Environment Variable Configuration
+  test-global-env:
+    name: Test Global Environment Variables
     runs-on: ubuntu-latest
     
     steps:
@@ -31,15 +31,15 @@ jobs:
       - name: Install ASDF
         uses: asdf-vm/actions/setup@v3
 
-      - name: Setup ASDF Plugins from Environment Variables
-        id: env-setup
+      - name: Setup ASDF Plugins
+        id: setup
         uses: ./setup-asdf-plugins
-        # No inputs needed! Uses global environment variables
+        # No configuration needed! Uses global env vars
 
-      - name: Verify environment variable setup
+      - name: Verify global environment setup
         run: |
-          echo "=== Environment Variable Setup Verification ==="
-          echo "Installed plugins: ${{ steps.env-setup.outputs.installed-plugins }}"
+          echo "=== Global Environment Setup Verification ==="
+          echo "Installed plugins: ${{ steps.setup.outputs.installed-plugins }}"
           echo ""
           
           echo "=== Version Information ==="
@@ -53,75 +53,22 @@ jobs:
           echo ""
           
           echo "=== Test Functionality ==="
-          echo "console.log('Hello from Deno via env vars!');"; | deno run -
-          echo 'public class EnvTest { public static void main(String[] args) { System.out.println("Hello from Java via env vars!"); } }' > EnvTest.java
-          javac EnvTest.java
-          java EnvTest
-
-  test-basic-plugins:
-    name: Test Basic Plugin Installation
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Setup ASDF Plugins - Basic
-        id: asdf-setup
-        uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {"name": "deno", "version": "2.3.1"},
-              {
-                "name": "java", 
-                "version": "adoptopenjdk-17.0.14+7",
-                "env": {"JAVA_HOME": "{install_path}"}
-              }
-            ]
-          add-to-path: "deno"
-
-      - name: Verify installations
-        run: |
-          echo "=== Installation Verification ==="
-          echo "Installed plugins: ${{ steps.asdf-setup.outputs.installed-plugins }}"
-          echo ""
-          
-          # Parse installation paths
-          DENO_PATH=$(echo '${{ steps.asdf-setup.outputs.installed-plugins }}' | jq -r '.deno')
-          JAVA_PATH=$(echo '${{ steps.asdf-setup.outputs.installed-plugins }}' | jq -r '.java')
-          
-          echo "Deno installed at: $DENO_PATH"
-          echo "Java installed at: $JAVA_PATH"
-          echo "JAVA_HOME: $JAVA_HOME"
-          echo ""
-          
-          echo "=== Version Information ==="
-          deno --version
-          echo ""
-          java -version
-          echo ""
-          
-          echo "=== PATH Verification ==="
-          echo "Deno in PATH: $(which deno)"
-          echo "Java in PATH: $(which java)"
-
-      - name: Test functionality
-        run: |
-          echo "=== Testing Deno ==="
           echo "console.log('Hello from Deno!');" | deno run -
-          
-          echo "=== Testing Java ==="
-          echo 'public class Test { public static void main(String[] args) { System.out.println("Hello from Java!"); } }' > Test.java
-          javac Test.java
-          java Test
+          echo 'public class GlobalTest { public static void main(String[] args) { System.out.println("Hello from Java!"); } }' > GlobalTest.java
+          javac GlobalTest.java
+          java GlobalTest
 
-  test-multiple-plugins:
-    name: Test Multiple Different Plugins
+  test-job-level-override:
+    name: Test Job-Level Environment Override
     runs-on: ubuntu-latest
+    env:
+      # Override global environment for this job
+      ASDF_PLUGINS: |
+        [
+          {"name": "node", "version": "20.10.0"},
+          {"name": "python", "version": "3.11.7"}
+        ]
+      ASDF_ADD_TO_PATH: "node,python"
     
     steps:
       - name: Checkout repository
@@ -130,173 +77,16 @@ jobs:
       - name: Install ASDF
         uses: asdf-vm/actions/setup@v3
 
-      - name: Setup Multiple ASDF Plugins
-        id: multi-setup
+      - name: Setup Different Tools for This Job
+        id: job-setup
         uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {"name": "node", "version": "20.10.0"},
-              {"name": "python", "version": "3.11.7"},
-              {
-                "name": "golang",
-                "version": "1.21.5",
-                "env": {
-                  "GOROOT": "{install_path}",
-                  "GOPATH": "$HOME/go"
-                }
-              }
-            ]
-          add-to-path: "node,python,golang"
+        # Uses job-level env vars (Node + Python, not Deno + Java)
 
-      - name: Verify multiple installations
+      - name: Verify job-level override
         run: |
-          echo "=== Multiple Plugin Installation Results ==="
-          echo "Installed plugins: ${{ steps.multi-setup.outputs.installed-plugins }}"
-          echo ""
-          
-          echo "=== Version Checks ==="
-          node --version
-          python --version
-          go version
-          echo ""
-          
-          echo "=== Environment Variables ==="
-          echo "GOROOT: $GOROOT"
-          echo "GOPATH: $GOPATH"
-          echo ""
-          
-          echo "=== PATH Verification ==="
-          echo "Node: $(which node)"
-          echo "Python: $(which python)"
-          echo "Go: $(which go)"
-
-      - name: Test functionality
-        run: |
-          echo "=== Testing Node.js ==="
-          echo "console.log('Hello from Node.js!');" | node
-          
-          echo "=== Testing Python ==="
-          echo "print('Hello from Python!')" | python
-          
-          echo "=== Testing Go ==="
-          mkdir -p /tmp/go-test
-          cd /tmp/go-test
-          go mod init test
-          echo 'package main; import "fmt"; func main() { fmt.Println("Hello from Go!") }' > main.go
-          go run main.go
-
-  test-custom-plugin-url:
-    name: Test Custom Plugin URL
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Setup Plugin with Custom URL
-        id: custom-setup
-        uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {
-                "name": "deno",
-                "version": "2.3.1",
-                "url": "https://github.com/asdf-community/asdf-deno.git"
-              },
-              {
-                "name": "java",
-                "version": "adoptopenjdk-17.0.14+7",
-                "url": "https://github.com/halcyon/asdf-java.git",
-                "env": {"JAVA_HOME": "{install_path}"}
-              }
-            ]
-          add-to-path: "deno"
-
-      - name: Verify custom URL installation
-        run: |
-          echo "=== Custom URL Installation Results ==="
-          echo "Installed plugins: ${{ steps.custom-setup.outputs.installed-plugins }}"
-          echo ""
-          
-          deno --version
-          java -version
-          
-          echo "=== Verify Environment ==="
-          echo "JAVA_HOME: $JAVA_HOME"
-
-  test-error-handling:
-    name: Test Error Handling
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Test Invalid JSON
-        continue-on-error: true
-        uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {"name": "deno", "version": "2.3.1"
-            ]
-
-      - name: Test Missing Required Fields
-        continue-on-error: true
-        uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {"name": "deno"},
-              {"version": "1.0.0"}
-            ]
-
-      - name: Test Valid Configuration (Should Work)
-        uses: ./setup-asdf-plugins
-        with:
-          plugins: |
-            [
-              {"name": "deno", "version": "2.3.1"}
-            ]
-
-  test-override-env-vars:
-    name: Test Input Override of Environment Variables
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Override Environment Variables with Inputs
-        id: override-setup
-        uses: ./setup-asdf-plugins
-        with:
-          # This will override the global ASDF_PLUGINS environment variable
-          plugins: |
-            [
-              {"name": "node", "version": "20.10.0"},
-              {"name": "python", "version": "3.11.7"}
-            ]
-          # This will override the global ASDF_ADD_TO_PATH environment variable
-          add-to-path: "node,python"
-
-      - name: Verify override functionality
-        run: |
-          echo "=== Override Verification ==="
-          echo "Should have Node and Python (not Deno and Java from env vars)"
-          echo "Installed plugins: ${{ steps.override-setup.outputs.installed-plugins }}"
+          echo "=== Job-Level Override Verification ==="
+          echo "Should have Node and Python (not Deno and Java)"
+          echo "Installed plugins: ${{ steps.job-setup.outputs.installed-plugins }}"
           echo ""
           
           echo "=== Version Information ==="
@@ -316,3 +106,211 @@ jobs:
           else
             echo "✅ Java not found (correct - was overridden)"
           fi
+          
+          echo ""
+          echo "=== Test Functionality ==="
+          echo "console.log('Hello from Node.js!');" | node
+          echo "print('Hello from Python!')" | python
+
+  test-multi-language-stack:
+    name: Test Multi-Language Development Stack
+    runs-on: ubuntu-latest
+    env:
+      ASDF_PLUGINS: |
+        [
+          {"name": "node", "version": "20.10.0"},
+          {"name": "python", "version": "3.11.7"},
+          {
+            "name": "golang",
+            "version": "1.21.5",
+            "env": {
+              "GOROOT": "{install_path}",
+              "GOPATH": "$HOME/go"
+            }
+          },
+          {"name": "rust", "version": "1.75.0"}
+        ]
+      ASDF_ADD_TO_PATH: "node,python,golang,rust"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Setup Multi-Language Stack
+        id: multi-setup
+        uses: ./setup-asdf-plugins
+
+      - name: Verify multi-language installation
+        run: |
+          echo "=== Multi-Language Stack Verification ==="
+          echo "Installed plugins: ${{ steps.multi-setup.outputs.installed-plugins }}"
+          echo ""
+          
+          echo "=== Version Checks ==="
+          node --version
+          python --version
+          go version
+          rustc --version
+          echo ""
+          
+          echo "=== Environment Variables ==="
+          echo "GOROOT: $GOROOT"
+          echo "GOPATH: $GOPATH"
+          echo ""
+          
+          echo "=== PATH Verification ==="
+          echo "Node: $(which node)"
+          echo "Python: $(which python)"
+          echo "Go: $(which go)"
+          echo "Rust: $(which rustc)"
+
+      - name: Test all languages
+        run: |
+          echo "=== Testing Node.js ==="
+          echo "console.log('Hello from Node.js!');" | node
+          
+          echo "=== Testing Python ==="
+          echo "print('Hello from Python!')" | python
+          
+          echo "=== Testing Go ==="
+          mkdir -p /tmp/go-test
+          cd /tmp/go-test
+          go mod init test
+          echo 'package main; import "fmt"; func main() { fmt.Println("Hello from Go!") }' > main.go
+          go run main.go
+          
+          echo "=== Testing Rust ==="
+          echo 'fn main() { println!("Hello from Rust!"); }' > /tmp/hello.rs
+          rustc /tmp/hello.rs -o /tmp/hello
+          /tmp/hello
+
+  test-custom-plugin-urls:
+    name: Test Custom Plugin URLs
+    runs-on: ubuntu-latest
+    env:
+      ASDF_PLUGINS: |
+        [
+          {
+            "name": "deno",
+            "version": "2.3.1",
+            "url": "https://github.com/asdf-community/asdf-deno.git"
+          },
+          {
+            "name": "java",
+            "version": "adoptopenjdk-17.0.14+7",
+            "url": "https://github.com/halcyon/asdf-java.git",
+            "env": {"JAVA_HOME": "{install_path}"}
+          }
+        ]
+      ASDF_ADD_TO_PATH: "deno"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Setup Plugins with Custom URLs
+        id: custom-setup
+        uses: ./setup-asdf-plugins
+
+      - name: Verify custom URL installation
+        run: |
+          echo "=== Custom URL Installation Results ==="
+          echo "Installed plugins: ${{ steps.custom-setup.outputs.installed-plugins }}"
+          echo ""
+          
+          deno --version
+          java -version
+          
+          echo "=== Verify Environment ==="
+          echo "JAVA_HOME: $JAVA_HOME"
+
+  test-devops-tools:
+    name: Test DevOps Tools Stack
+    runs-on: ubuntu-latest
+    env:
+      ASDF_PLUGINS: |
+        [
+          {"name": "kubectl", "version": "1.28.4"},
+          {"name": "helm", "version": "3.13.2"},
+          {"name": "terraform", "version": "1.6.4"}
+        ]
+      ASDF_ADD_TO_PATH: "kubectl,helm,terraform"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Setup DevOps Tools
+        id: devops-setup
+        uses: ./setup-asdf-plugins
+
+      - name: Verify DevOps tools
+        run: |
+          echo "=== DevOps Tools Verification ==="
+          echo "Installed plugins: ${{ steps.devops-setup.outputs.installed-plugins }}"
+          echo ""
+          
+          echo "=== Version Information ==="
+          kubectl version --client
+          helm version
+          terraform version
+          echo ""
+          
+          echo "=== PATH Verification ==="
+          echo "kubectl: $(which kubectl)"
+          echo "helm: $(which helm)"
+          echo "terraform: $(which terraform)"
+
+  test-error-handling:
+    name: Test Error Handling
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Test Missing Environment Variable
+        continue-on-error: true
+        uses: ./setup-asdf-plugins
+        env:
+          ASDF_PLUGINS: ""  # Empty - should fail
+
+      - name: Test Invalid JSON
+        continue-on-error: true
+        uses: ./setup-asdf-plugins
+        env:
+          ASDF_PLUGINS: |
+            [
+              {"name": "deno", "version": "2.3.1"
+            ]
+
+      - name: Test Missing Required Fields
+        continue-on-error: true
+        uses: ./setup-asdf-plugins
+        env:
+          ASDF_PLUGINS: |
+            [
+              {"name": "deno"},
+              {"version": "1.0.0"}
+            ]
+
+      - name: Test Valid Configuration (Should Work)
+        uses: ./setup-asdf-plugins
+        env:
+          ASDF_PLUGINS: |
+            [
+              {"name": "deno", "version": "2.3.1"}
+            ]

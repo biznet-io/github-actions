@@ -1,15 +1,5 @@
 name: 'Setup ASDF Plugins'
-description: 'Install and configure any ASDF plugins with specified versions'
-
-inputs:
-  plugins:
-    description: 'JSON array of plugins to install. Format: [{"name": "plugin-name", "version": "version", "url": "optional-plugin-url", "env": {"VAR_NAME": "path/to/set"}}]. If not provided, will use ASDF_PLUGINS environment variable.'
-    required: false
-    default: ''
-  add-to-path:
-    description: 'Comma-separated list of plugin names to add to PATH (will add {plugin-install-path}/bin to PATH). If not provided, will use ASDF_ADD_TO_PATH environment variable.'
-    required: false
-    default: ''
+description: 'Install and configure any ASDF plugins with specified versions using environment variables'
 
 outputs:
   installed-plugins:
@@ -22,4 +12,4 @@ runs:
     - name: Setup ASDF Plugins
       id: setup
       shell: bash
-      run: ${{ github.action_path }}/setup-plugins.sh '${{ inputs.plugins }}' '${{ inputs.add-to-path }}'
+      run: ${{ github.action_path }}/setup-plugins.sh

@@ -6,20 +6,9 @@ set -euo pipefail
 # Enable debug mode if DEBUG is set or GitHub Actions debug is enabled
 [[ "${DEBUG:-}" == "true" || "${RUNNER_DEBUG:-}" == "1" ]] && set -x
 
-# Input parameters with environment variable fallbacks
-PLUGINS_JSON="${1:-}"
-ADD_TO_PATH="${2:-}"
-
-# Use environment variables as fallback if inputs are empty
-if [[ -z "$PLUGINS_JSON" && -n "${ASDF_PLUGINS:-}" ]]; then
-    PLUGINS_JSON="$ASDF_PLUGINS"
-    log_info "Using ASDF_PLUGINS environment variable"
-fi
-
-if [[ -z "$ADD_TO_PATH" && -n "${ASDF_ADD_TO_PATH:-}" ]]; then
-    ADD_TO_PATH="$ASDF_ADD_TO_PATH"
-    log_info "Using ASDF_ADD_TO_PATH environment variable"
-fi
+# Get configuration from environment variables
+PLUGINS_JSON="${ASDF_PLUGINS:-}"
+ADD_TO_PATH="${ASDF_ADD_TO_PATH:-}"
 
 # GitHub Actions logging functions
 log_info() {
@@ -69,13 +58,19 @@ set_output() {
     fi
 }
 
-# Validate JSON input
-validate_json() {
+# Validate environment variables
+validate_environment() {
     if [[ -z "$PLUGINS_JSON" ]]; then
-        log_error "No plugins specified. Please provide plugins via:"
-        log_error "  1. 'plugins' input parameter, or"
-        log_error "  2. ASDF_PLUGINS environment variable"
-        log_error "Both should contain a JSON array of plugins to install."
+        log_error "ASDF_PLUGINS environment variable is required but not set."
+        log_error "Please set ASDF_PLUGINS with a JSON array of plugins to install."
+        log_error ""
+        log_error "Example:"
+        log_error "  env:"
+        log_error "    ASDF_PLUGINS: |"
+        log_error "      ["
+        log_error "        {\"name\": \"deno\", \"version\": \"2.3.1\"},"
+        log_error "        {\"name\": \"java\", \"version\": \"adoptopenjdk-17.0.14+7\"}"
+        log_error "      ]"
         return 1
     fi
 
@@ -87,13 +82,13 @@ validate_json() {
 
     # Validate JSON format
     if ! echo "$PLUGINS_JSON" | jq empty 2>/dev/null; then
-        log_error "Invalid JSON format in plugins input"
+        log_error "Invalid JSON format in ASDF_PLUGINS environment variable"
         return 1
     fi
 
     # Check if it's an array
     if [[ "$(echo "$PLUGINS_JSON" | jq -r 'type')" != "array" ]]; then
-        log_error "Plugins input must be a JSON array"
+        log_error "ASDF_PLUGINS must be a JSON array"
         return 1
     fi
 }
@@ -239,25 +234,13 @@ install_plugin() {
 # Main installation function
 main() {
     log_info "Starting ASDF plugins setup..."
+    log_info "Configuration source: Environment variables"
     
-    # Show configuration source
-    if [[ "${1:-}" != "$PLUGINS_JSON" ]]; then
-        log_info "Configuration source: ASDF_PLUGINS environment variable"
-    else
-        log_info "Configuration source: plugins input parameter"
-    fi
+    log_debug "ASDF_PLUGINS: $PLUGINS_JSON"
+    log_debug "ASDF_ADD_TO_PATH: $ADD_TO_PATH"
     
-    if [[ "${2:-}" != "$ADD_TO_PATH" ]]; then
-        log_info "PATH configuration source: ASDF_ADD_TO_PATH environment variable"
-    elif [[ -n "$ADD_TO_PATH" ]]; then
-        log_info "PATH configuration source: add-to-path input parameter"
-    fi
-    
-    log_debug "Plugins JSON: $PLUGINS_JSON"
-    log_debug "Add to PATH: $ADD_TO_PATH"
-    
-    # Validate input
-    validate_json
+    # Validate environment
+    validate_environment
     
     # Parse plugins array
     local plugins_count

@@ -1,6 +1,6 @@
 name: Simple ASDF Setup Example
 
-# Define your tools once at the workflow level
+# Define your development tools once at the workflow level
 env:
   ASDF_PLUGINS: |
     [
@@ -17,49 +17,64 @@ env:
 on: [push, pull_request]
 
 jobs:
-  build:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
+      - uses: asdf-vm/actions/setup@v3
       
       - name: Setup Development Tools
         uses: ./setup-asdf-plugins
-        # That's it! No configuration needed - uses environment variables
+        # That's it! No configuration needed
       
-      - name: Build and test
+      - name: Build Frontend
         run: |
-          # Now you can use your tools
+          # All your tools are ready to use
           deno --version
           node --version
-          java -version
           
-          # Your build commands here
-          echo "Building with Deno, Node, and Java..."
+          # Your frontend build commands
+          echo "Building frontend with Deno and Node..."
 
-  different-tools:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: asdf-vm/actions/setup@v3
       
-      - name: Install ASDF
-        uses: asdf-vm/actions/setup@v3
-      
-      - name: Setup Different Tools for This Job
+      - name: Setup Development Tools
         uses: ./setup-asdf-plugins
-        with:
-          # Override global config for this specific job
-          plugins: |
-            [
-              {"name": "python", "version": "3.11.7"},
-              {"name": "golang", "version": "1.21.5"}
-            ]
-          add-to-path: "python,golang"
+        # Same tools, no duplication!
       
-      - name: Build with different tools
+      - name: Build Backend
         run: |
-          python --version
-          go version
-          echo "Building with Python and Go..."
+          # All your tools are ready to use
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+          
+          # Your backend build commands
+          echo "Building backend with Java..."
+
+  mobile:
+    runs-on: ubuntu-latest
+    env:
+      # Override tools for this specific job
+      ASDF_PLUGINS: |
+        [
+          {"name": "flutter", "version": "3.16.0"},
+          {"name": "java", "version": "adoptopenjdk-17.0.14+7"}
+        ]
+      ASDF_ADD_TO_PATH: "flutter"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: asdf-vm/actions/setup@v3
+      
+      - name: Setup Mobile Development Tools
+        uses: ./setup-asdf-plugins
+        # Uses job-specific tools (Flutter + Java)
+      
+      - name: Build Mobile App
+        run: |
+          flutter --version
+          java -version
+          echo "Building mobile app with Flutter..."
