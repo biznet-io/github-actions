@@ -207,6 +207,8 @@ install_plugin() {
         else
             log_warning "Invalid JSON in env section for $plugin_name, skipping environment variables"
             log_debug "Invalid JSON: $plugin_env"
+            log_debug "JSON validation error: $jq_env_error"
+            log_debug "Raw plugin data: $plugin_data"
         fi
     fi
 
@@ -304,7 +306,13 @@ main() {
         plugin_name=$(echo "$plugin_data" | jq -r '.name // empty' 2>/dev/null || echo "")
         plugin_version=$(echo "$plugin_data" | jq -r '.version // empty' 2>/dev/null || echo "")
         plugin_url=$(echo "$plugin_data" | jq -r '.url // empty' 2>/dev/null || echo "")
-        plugin_env=$(echo "$plugin_data" | jq -c '.env // {}' 2>/dev/null || echo "{}")
+
+        # Handle env extraction more carefully
+        if echo "$plugin_data" | jq -e '.env' >/dev/null 2>&1; then
+            plugin_env=$(echo "$plugin_data" | jq -c '.env' 2>/dev/null || echo "{}")
+        else
+            plugin_env="{}"
+        fi
 
         log_debug "Extracted plugin data:"
         log_debug "  name: '$plugin_name'"
