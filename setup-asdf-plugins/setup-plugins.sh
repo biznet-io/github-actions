@@ -45,19 +45,6 @@ end_group() {
     echo "::endgroup::"
 }
 
-# Set GitHub Actions outputs
-set_output() {
-    local name="$1"
-    local value="$2"
-
-    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-        echo "$name=$value" >> "$GITHUB_OUTPUT"
-        log_debug "Set output: $name=$value"
-    else
-        log_warning "GITHUB_OUTPUT not available, cannot set output: $name=$value"
-    fi
-}
-
 # Debug JSON content
 debug_json() {
     log_debug "=== JSON Debug Information ==="
@@ -343,9 +330,6 @@ main() {
             exit 1
         fi
     done
-
-    # Set output with all installation paths
-    set_output "installed-plugins" "$installed_plugins"
 
     # Log summary
     start_group "Installation Summary"

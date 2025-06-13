@@ -1,11 +1,6 @@
 name: 'Setup ASDF Plugins'
 description: 'Install and configure any ASDF plugins with specified versions using environment variables'
 
-outputs:
-  installed-plugins:
-    description: 'JSON object with installation paths for each plugin'
-    value: ${{ steps.setup.outputs.installed-plugins }}
-
 runs:
   using: 'composite'
   steps:
