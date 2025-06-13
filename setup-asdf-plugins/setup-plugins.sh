@@ -181,7 +181,7 @@ install_plugin() {
 
     # Get installation path
     local install_path
-    install_path=$(echo "$(asdf "$plugin_name")")
+    install_path=$(echo "$(asdf where "$plugin_name")")
 
     if [[ -z "$install_path" ]]; then
         log_error "Failed to get installation path for $plugin_name"
