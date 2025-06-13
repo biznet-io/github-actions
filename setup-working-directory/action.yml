@@ -12,9 +12,9 @@ inputs:
     required: false
 
 outputs:
-  WORKING_DIRECTORY:
+  workingDirectory:
     description: 'The generated working directory'
-    value:  ${{ steps.set-working-directory.outputs.WORKING_DIRECTORY }}
+    value:  ${{ steps.set-working-directory.outputs.workingDirectory }}
 
 runs:
   using: 'composite'
@@ -47,4 +47,4 @@ runs:
 
         # Set as default working directory for following steps
         echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> "${GITHUB_ENV}"
-        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> "${GITHUB_OUTPUT}"
+        echo "workingDirectory=${WORKING_DIRECTORY}" >> "${GITHUB_OUTPUT}"
