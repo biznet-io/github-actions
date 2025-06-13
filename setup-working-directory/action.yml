@@ -20,26 +20,24 @@ runs:
         # Use the branch input if provided, otherwise fallback to GITHUB_REF
         BRANCH_NAME="${{ inputs.BRANCH_NAME || env.BRANCH_NAME }}"
 
-        # Tmp - Define the getSlug function (copied from init-cache.sh)
-        function getSlug {
-          local name=$1
-          # Step 1: Convert to lowercase
-          local nameLower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
+        if [[ -z "$BRANCH_NAME" ]]; then
+          echo "No branch name provided, using GITHUB_REF: $GITHUB_REF"
+          BRANCH_NAME=$GITHUB_REF
+        else
+          BRANCH_NAME=$("refs/heads/$BRANCH_NAME")
+        fi  
+        
+        # Sanitize workflow name for filesystem compatibility
+        WORKFLOW_NAME="${{ github.workflow }}"
+        WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g' | tr '[:upper:]' '[:lower:]')
+        
+        # Create working directory with separated prefix and branch structure
+        WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${WORKFLOW_NAME}/${BRANCH_NAME}"
 
-          # Step 2: Replace all characters except 0-9 and a-z with a hyphen
-          local slug=$(echo "$nameLower" | sed 's/[^a-z0-9]/-/g')
-
-          # Step 3: Remove leading and trailing hyphens
-          slug=$(echo "$slug" | sed 's/^-//' | sed 's/-$//')
-          echo "$slug"
-        }
-
-        BRANCH_NAME=$(getSlug "$BRANCH_NAME")
-
-        WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/branches/${BRANCH_NAME:-$GITHUB_REF}"
 
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
+        echo "Original Branch Name: ${BRANCH_NAME}"
         echo "WORKING_DIRECTORY: ${WORKING_DIRECTORY}"
 
         # Set as default working directory for following steps
