@@ -9,6 +9,7 @@ inputs:
     description: 'The working directory to init the workflow in'
     required: false
 
+
 runs:
   using: 'composite'
   steps:
