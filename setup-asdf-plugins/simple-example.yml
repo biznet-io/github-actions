@@ -1,0 +1,65 @@
+name: Simple ASDF Setup Example
+
+# Define your tools once at the workflow level
+env:
+  ASDF_PLUGINS: |
+    [
+      {"name": "deno", "version": "2.3.1"},
+      {
+        "name": "java", 
+        "version": "adoptopenjdk-17.0.14+7",
+        "env": {"JAVA_HOME": "{install_path}"}
+      },
+      {"name": "node", "version": "20.10.0"}
+    ]
+  ASDF_ADD_TO_PATH: "deno,node"
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+      
+      - name: Setup Development Tools
+        uses: ./setup-asdf-plugins
+        # That's it! No configuration needed - uses environment variables
+      
+      - name: Build and test
+        run: |
+          # Now you can use your tools
+          deno --version
+          node --version
+          java -version
+          
+          # Your build commands here
+          echo "Building with Deno, Node, and Java..."
+
+  different-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install ASDF
+        uses: asdf-vm/actions/setup@v3
+      
+      - name: Setup Different Tools for This Job
+        uses: ./setup-asdf-plugins
+        with:
+          # Override global config for this specific job
+          plugins: |
+            [
+              {"name": "python", "version": "3.11.7"},
+              {"name": "golang", "version": "1.21.5"}
+            ]
+          add-to-path: "python,golang"
+      
+      - name: Build with different tools
+        run: |
+          python --version
+          go version
+          echo "Building with Python and Go..."
