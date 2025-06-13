@@ -29,7 +29,7 @@ runs:
         
         # Sanitize workflow name for filesystem compatibility
         WORKFLOW_NAME="${{ github.workflow }}"
-        WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+        WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g' | tr '[:upper:]' '[:lower:]')
         
         # Create working directory with separated prefix and branch structure
         WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${WORKFLOW_NAME}/${BRANCH_NAME}"
