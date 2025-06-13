@@ -178,40 +178,6 @@ install_plugin() {
 
     log_info "Installed $plugin_name at: $install_path"
 
-    # Handle environment variables
-    if [[ "$plugin_env" != "{}" && "$plugin_env" != "null" ]]; then
-        log_info "Setting up environment variables for $plugin_name..."
-        log_debug "Plugin env JSON: $plugin_env"
-
-        # Validate JSON before processing
-        if echo "$plugin_env" | jq empty 2>/dev/null; then
-            # Parse and set environment variables
-            while IFS= read -r env_var; do
-                if [[ -n "$env_var" && "$env_var" != "null" ]]; then
-                    local var_name var_value
-                    var_name=$(echo "$env_var" | cut -d'=' -f1)
-                    var_value=$(echo "$env_var" | cut -d'=' -f2-)
-
-                    # Replace placeholder with actual install path
-                    var_value="${var_value//\{install_path\}/$install_path}"
-
-                    # Export for current session
-                    export "$var_name"="$var_value"
-
-                    # Add to GitHub Actions environment
-                    echo "$var_name=$var_value" >> "$GITHUB_ENV"
-
-                    log_info "Set $var_name=$var_value"
-                fi
-            done < <(echo "$plugin_env" | jq -r 'to_entries[]? | "\(.key)=\(.value)"' 2>/dev/null || true)
-        else
-            log_warning "Invalid JSON in env section for $plugin_name, skipping environment variables"
-            log_debug "Invalid JSON: $plugin_env"
-            log_debug "JSON validation error: $jq_env_error"
-            log_debug "Raw plugin data: $plugin_data"
-        fi
-    fi
-
     # Check if plugin should be added to PATH
     if [[ ",$ADD_TO_PATH," == *",$plugin_name,"* ]]; then
         local bin_path="$install_path/bin"
@@ -306,13 +272,7 @@ main() {
         plugin_name=$(echo "$plugin_data" | jq -r '.name // empty' 2>/dev/null || echo "")
         plugin_version=$(echo "$plugin_data" | jq -r '.version // empty' 2>/dev/null || echo "")
         plugin_url=$(echo "$plugin_data" | jq -r '.url // empty' 2>/dev/null || echo "")
-
-        # Handle env extraction more carefully
-        if echo "$plugin_data" | jq -e '.env' >/dev/null 2>&1; then
-            plugin_env=$(echo "$plugin_data" | jq -c '.env' 2>/dev/null || echo "{}")
-        else
-            plugin_env="{}"
-        fi
+        plugin_env=$(echo "$plugin_data" | jq -c '.env // {}' 2>/dev/null || echo "{}")
 
         log_debug "Extracted plugin data:"
         log_debug "  name: '$plugin_name'"
