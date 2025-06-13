@@ -11,6 +11,11 @@ inputs:
     default: ''
     required: false
 
+outputs:
+  WORKING_DIRECTORY:
+    description: 'The generated working directory'
+    value:  ${{ steps.set_working_directory.outputs.WORKING_DIRECTORY }}
+
 runs:
   using: 'composite'
   steps:
@@ -25,12 +30,12 @@ runs:
           BRANCH_NAME=$GITHUB_REF
         else
           BRANCH_NAME=$("refs/heads/$BRANCH_NAME")
-        fi  
-        
+        fi
+
         # Sanitize workflow name for filesystem compatibility
         WORKFLOW_NAME="${{ github.workflow }}"
         WORKFLOW_NAME=$(echo "$WORKFLOW_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g' | tr '[:upper:]' '[:lower:]')
-        
+
         # Create working directory with separated prefix and branch structure
         WORKING_DIRECTORY="${{ inputs.PATH || env.WORKING_DIRECTORY_PREFIX }}/${GITHUB_REPOSITORY}/${WORKFLOW_NAME}/${BRANCH_NAME}"
 
@@ -38,7 +43,8 @@ runs:
         # Make sure the directory exists
         mkdir -p ${WORKING_DIRECTORY}
         echo "Original Branch Name: ${BRANCH_NAME}"
-        echo "WORKING_DIRECTORY: ${WORKING_DIRECTORY}"
+        echo "WORKING_DIRECTORY: "${WORKING_DIRECTORY}"
 
         # Set as default working directory for following steps
-        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> $GITHUB_ENV
+        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> "${GITHUB_ENV}"
+        echo "WORKING_DIRECTORY=${WORKING_DIRECTORY}" >> "${GITHUB_OUTPUT}"
