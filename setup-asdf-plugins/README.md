@@ -348,6 +348,101 @@ The action includes comprehensive error handling:
 - **Path Validation**: Ensures binary paths exist before adding to PATH
 - **Fail Fast**: Stops execution on first critical error
 
+## Troubleshooting
+
+### Common JSON Parsing Errors
+
+If you get errors like "parse error: Unmatched '}'", here are common causes:
+
+#### 1. Invalid JSON Syntax
+```yaml
+# ❌ Wrong - Missing closing quote
+env:
+  ASDF_PLUGINS: |
+    [
+      {"name": "deno, "version": "2.3.1"}
+    ]
+
+# ✅ Correct
+env:
+  ASDF_PLUGINS: |
+    [
+      {"name": "deno", "version": "2.3.1"}
+    ]
+```
+
+#### 2. YAML Multiline String Issues
+```yaml
+# ❌ Wrong - Inconsistent indentation
+env:
+  ASDF_PLUGINS: |
+    [
+      {"name": "deno", "version": "2.3.1"},
+    {"name": "java", "version": "adoptopenjdk-17.0.14+7"}
+    ]
+
+# ✅ Correct - Consistent indentation
+env:
+  ASDF_PLUGINS: |
+    [
+      {"name": "deno", "version": "2.3.1"},
+      {"name": "java", "version": "adoptopenjdk-17.0.14+7"}
+    ]
+```
+
+#### 3. Use the Debug Tool
+
+The action includes a debug script to help troubleshoot JSON issues:
+
+```bash
+# In your repository
+chmod +x setup-asdf-plugins/debug-json.sh
+
+# Set your environment variable
+export ASDF_PLUGINS='[{"name": "deno", "version": "2.3.1"}]'
+
+# Run the debug tool
+./setup-asdf-plugins/debug-json.sh
+```
+
+#### 4. Enable Debug Mode
+
+```yaml
+jobs:
+  debug-build:
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: true  # Enable detailed logging
+      ASDF_PLUGINS: |
+        [
+          {"name": "deno", "version": "2.3.1"}
+        ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: asdf-vm/actions/setup@v3
+      - uses: ./setup-asdf-plugins
+```
+
+#### 5. Test JSON Locally
+
+You can test your JSON syntax locally:
+
+```bash
+# Test if your JSON is valid
+echo '[{"name": "deno", "version": "2.3.1"}]' | jq .
+
+# Should output pretty-printed JSON if valid
+```
+
+### Common Issues and Solutions
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `parse error: Unmatched '}'` | Invalid JSON syntax | Check quotes, commas, brackets |
+| `ASDF_PLUGINS must be a JSON array` | JSON is object, not array | Wrap in `[...]` |
+| `Plugin at index X is missing required 'name' or 'version'` | Missing fields | Ensure all plugins have `name` and `version` |
+| `jq is required but not installed` | Missing jq | Use `ubuntu-latest` runner (has jq pre-installed) |
+
 ## Debug Mode
 
 Enable debug logging:
